@@ -1,2 +1,2 @@
 # the_orb
-Do not look direclty at The Orb.
+Do not look directly at The Orb.
