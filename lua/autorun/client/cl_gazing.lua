@@ -1,5 +1,3 @@
-local DrawColorModify = DrawColorModify
-local DrawSobel = DrawSobel
 local util_ScreenShake = util.ScreenShake
 local IsValid = IsValid
 local rawset = rawset
@@ -71,7 +69,7 @@ local function calcView( _, pos, angles, fov )
         return
     end
 
-    local intensity = localplayer():getnwfloat( "theorb_gazeintensity", 0 )
+    local intensity = LocalPlayer():GetNWFloat( "TheOrb_GazeIntensity", 0 )
 
     local newFov = fov * ( 1 - intensity )
     newFov = math_max( 15, newFov )
@@ -92,10 +90,10 @@ local function screenEffects()
         return
     end
 
-    DrawColorModify( currentTable )
-    local intensity = localplayer():getnwfloat( "theorb_gazeintensity", 0 )
+    _G.DrawColorModify( currentTable )
+    local intensity = LocalPlayer():GetNWFloat( "TheOrb_GazeIntensity", 0 )
     local sobel = 1.5 - intensity
-    DrawSobel( sobel )
+    _G.DrawSobel( sobel )
 end
 
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )

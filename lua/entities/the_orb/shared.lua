@@ -1,4 +1,4 @@
-DEFINE_BASECLASS( "base_anim" )
+DEFINE_BASECLASS( "base_gmodentity" )
 ENT.Type = "anim"
 ENT.PrintName = "The Orb"
 ENT.Purpose = "???"
@@ -21,4 +21,19 @@ function ENT:SetupDataTables()
         self:SetRevengeZap( true )
         self:SetEnergyColor( Vector( 255, 0, 0 ) )
     end
+end
+
+function ENT:Initialize()
+    self:SetModel( self.Model )
+    self:SetMoveType( MOVETYPE_VPHYSICS )
+    self:DrawShadow( false )
+    self:PhysicsInit( SOLID_VPHYSICS )
+
+    if SERVER then
+        self:SetPos( self:GetPos() + self.SpawnOffset )
+        self:GetPhysicsObject():EnableMotion( false )
+        OrbManager:AddOrb( self )
+    end
+
+    self:Activate()
 end

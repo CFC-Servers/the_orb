@@ -1,5 +1,5 @@
-AddCSLuaFile("cl_init.lua")
-AddCSLuaFile("shared.lua")
+AddCSLuaFile( "cl_init.lua" )
+AddCSLuaFile( "shared.lua" )
 include( "shared.lua" )
 
 local IsValid = IsValid
@@ -58,17 +58,6 @@ function ENT:CanZap( e )
     if StartWith( eClass, "logic_" ) then return false end
 end
 
-function ENT:Initialize()
-    self:SetModel( self.Model )
-    self:SetMoveType( MOVETYPE_VPHYSICS )
-    self:PhysicsInit( SOLID_VPHYSICS )
-    self:GetPhysicsObject():EnableMotion( false )
-    self:SetPos( self:GetPos() + self.SpawnOffset )
-    self:DrawShadow( false )
-
-    OrbManager:AddOrb( self )
-end
-
 function ENT:TossRagdoll( ragdoll, vel )
     local boneCount = ragdoll:GetPhysicsObjectCount() - 1
 
@@ -101,19 +90,19 @@ function ENT:MakePlayerRagdoll( ply )
     ragdoll:Spawn()
 
     ply:Spectate( OBS_MODE_CHASE )
-    ply:SpecateEntity( ragdoll )
+    ply:SpectateEntity( ragdoll )
 
     if ply.ZappedRagdoll then
         ply.ZappedRagdoll:Remove()
     end
     ply.ZappedRagdoll = ragdoll
 
-    self:TossRagdoll( ragdoll )
+    self:TossRagdoll( ragdoll, vel )
 end
 
 function ENT:BroadcastZap( target )
     local recipients = RecipientFilter()
-    recipients:AddPVS()
+    recipients:AddPVS( target:GetPos() )
 
     net.Start( "TheOrb_Zap" )
     net.WriteEntity( self )
@@ -123,13 +112,14 @@ end
 
 function ENT:HandlePlayerZap( ply )
     local plyPos = ply:GetPos()
-    local owner = self:GetOwner()
+    local owner = Entity(1)
 
+    local force = ( self:GetPos() - plyPos ) * 69420
     local dmg = DamageInfo()
     dmg:SetAttacker( owner )
     dmg:SetInflictor( self )
     dmg:SetDamageType( DMG_SHOCK + DMG_ENERGYBEAM )
-    dmg:SetDamageForce( 69420 )
+    dmg:SetDamageForce( force )
     dmg:SetDamage( 10000 )
     dmg:SetDamagePosition( plyPos )
     dmg:SetReportedPosition( plyPos )
@@ -142,7 +132,7 @@ function ENT:HandlePlayerZap( ply )
 end
 
 function ENT:Zap( target )
-    local targetPhys = phys:GetPhysicsObject()
+    local targetPhys = target:GetPhysicsObject()
     if IsValid( targetPhys ) then
         targetPhys:EnableMotion( false )
     end

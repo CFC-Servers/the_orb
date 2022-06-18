@@ -1,5 +1,7 @@
 local rawget = rawget
+local math_max = math.max
 
+util.AddNetworkString( "TheOrb_Zap" )
 resource.AddSingleFile( "sound/the_orb/chant.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-1.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-2.mp3" )
@@ -21,7 +23,8 @@ end
 function OrbManager:RemoveOrb( orb )
     self.Orbs[orb] = nil
     self.OrbCount = self.OrbCount - 1
-    assert( self.OrbCount > 0 )
+    print( self.OrbCount )
+    assert( self.OrbCount >= 0 )
 end
 
 local function handlePlayerView( ply )
@@ -53,7 +56,7 @@ local function handlePlayerView( ply )
                 ply.ScreamLoop = nil
                 ply:SetNWBool( "TheOrb_IsGazing", false )
                 ply:SetNWFloat( "TheOrb_GazeIntensity", 0 )
-                ply:Unlock()
+                ply:UnLock()
                 currentTarget:Zap( ply )
             end
         end
@@ -69,10 +72,10 @@ local function handlePlayerView( ply )
 
     if not ply.OrbTargeted then return end
 
-    ply.OrbLocked = false
-    ply:StopLoopingSound( ply.ScreamLoop )
-    ply.ScreamLoop = nil
-    ply:Unlock()
+    -- ply.OrbLocked = false
+    -- ply:StopLoopingSound( ply.ScreamLoop )
+    -- ply.ScreamLoop = nil
+    -- ply:Unlock()
 
 end
 

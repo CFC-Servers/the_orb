@@ -3,11 +3,13 @@ local CurTime = CurTime
 local DynamicLight = DynamicLight
 
 local math_Rand = math.Rand
+local math_random = math.random
 local table_insert = table.insert
 local util_Effect = util.Effect
 local sound_Play = sound.Play
 local sound_PlayFile = sound.PlayFile
 
+include( "shared.lua" )
 
 ENT.EmitOnZap = "ambient/machines/thumper_hit.wav"
 ENT.LightOffset = Vector( 0, 0, 45 )

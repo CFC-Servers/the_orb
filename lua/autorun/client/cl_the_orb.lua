@@ -6,6 +6,7 @@ local rawget = rawget
 local math_ceil = math.ceil
 local math_random = math.random
 local table_insert = table.insert
+local table_remove = table.remove
 local render_SetMaterial = render.SetMaterial
 local render_DrawBeam = render.DrawBeam
 
