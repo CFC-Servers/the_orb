@@ -4,7 +4,7 @@ ENT.PrintName = "The Orb"
 ENT.Purpose = "???"
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.Spawnable = true
-ENT.AdminOnly = false
+ENT.AdminOnly = true
 
 ENT.Material = "models/XQM/LightLinesRed_tool"
 ENT.Model = "models/hunter/misc/sphere1x1.mdl"
