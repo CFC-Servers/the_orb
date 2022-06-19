@@ -76,6 +76,7 @@ hook.Add( "PostDrawTranslucentRenderables", "TheOrb_DrawZaps", drawZaps )
 net.Receive( "TheOrb_Zap", function()
     local orb = net.ReadEntity()
     if not IsValid( orb ) then return end
+    if not orb.StartZap then return end
 
     local target = net.ReadEntity()
     if not IsValid( target ) then return end
