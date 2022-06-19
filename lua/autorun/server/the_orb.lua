@@ -1,5 +1,5 @@
+local IsValid = IsValid
 local rawget = rawget
-local math_max = math.max
 
 util.AddNetworkString( "TheOrb_Zap" )
 resource.AddSingleFile( "sound/the_orb/chant.mp3" )
@@ -8,75 +8,121 @@ resource.AddSingleFile( "sound/the_orb/thunder-2.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-3.mp3" )
 
 OrbManager = {
-    Orbs = {},
-    OrbCount = 0,
+    Orbs = {}
 }
 
 local minGazeDuration = 3
-local maxGazeDuration = 20.25
+local maxGazeDuration = 21.15
 
 function OrbManager:AddOrb( orb )
     self.Orbs[orb] = true
-    self.OrbCount = self.OrbCount + 1
 end
 
 function OrbManager:RemoveOrb( orb )
     self.Orbs[orb] = nil
-    self.OrbCount = self.OrbCount - 1
-    print( self.OrbCount )
-    assert( self.OrbCount >= 0 )
 end
 
+-- TODO:
+-- the nwfloat "StartedGazing" means 'when the player passed the minGazeDuration threshold'
+-- but the ply.StartedGazing var means 'when the player originally looked at the orb'
 local function handlePlayerView( ply )
-    local lastOrbTarget = ply.OrbTargeted
-    local currentTarget = ply:GetEyeTrace().Entity
-    local currentIsOrb = currentTarget.IsOrb
+    local target = ply:GetEyeTrace().Entity
+    local isTargetingOrb = IsValid( target ) and target.IsOrb
+    local wasTargetingOrb = ply.TargetingOrb
 
-    if currentTarget == lastOrbTarget then
-        if currentIsOrb then
-            local gazeDuration = CurTime() - ply.StartedGazing
+    if ( not wasTargetingOrb ) and ( not isTargetingOrb ) then return end
 
-            if gazeDuration >= minGazeDuration then
-                local adjustedDuration = math_max( 0.01, gazeDuration - minGazeDuration )
-                local intensity = adjustedDuration / maxGazeDuration
-                ply:SetNWFloat( "TheOrb_GazeIntensity", intensity )
+    if wasTargetingOrb and isTargetingOrb then
+        -- Still looking at an orb
 
-                if intensity >= 0.85 then
-                    ply.OrbLocked = true
-                    ply.ScreamLoop = ply:StartLoopingSound( "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
-                    ply:Lock()
-                end
+        if wasTargetingOrb == target then
+            -- Looking at the same orb
+            local duration = CurTime() - ply.StartedGazing
+
+            -- Don't need to do anything yet
+            if duration < minGazeDuration then
+                return
             end
 
-            if gazeDuration >= maxGazeDuration then
-                ply.OrbTargeted = nil
+            local adjustedDuration = duration - minGazeDuration
+            local intensity = adjustedDuration / maxGazeDuration
+
+            if not ply.IsGazing then
+                -- Is now considered gazing
+                ply.IsGazing = true
+                ply:SetNWBool( "TheOrb_IsGazing", true )
+                ply:SetNWFloat( "TheOrb_StartedGazing", CurTime() )
+            end
+
+            if intensity >= 0.7 and not ply.OrbLocked then
+                -- Player becomes orb-locked
+                ply.OrbLocked = true
+                ply.ScreamLoop = ply:StartLoopingSound( "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
+                ply:Lock()
+            end
+
+            if intensity >= 1 then
+                -- Distribute Judgement
+                target:Zap( ply )
+
+                ply.TargetingOrb = nil
                 ply.StartedGazing = nil
-                ply.OrbLocked = false
+                ply.IsGazing = nil
+
+                ply:UnLock()
+                ply.OrbLocked = nil
+
                 ply:StopLoopingSound( ply.ScreamLoop )
                 ply.ScreamLoop = nil
-                ply:SetNWBool( "TheOrb_IsGazing", false )
-                ply:SetNWFloat( "TheOrb_GazeIntensity", 0 )
-                ply:UnLock()
-                currentTarget:Zap( ply )
+
+                timer.Simple( 0.15, function()
+                    ply:SetNWBool( "TheOrb_IsGazing", false )
+                    ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+                end )
             end
+
+            return
+        else
+            -- Looking at a new orb
+            ply.TargetingOrb = target
+            ply.StartedGazing = CurTime()
+            ply.IsGazing = nil
+
+            if ply.OrbLocked then ply:UnLock() end
+            ply.OrbLocked = false
+
+            if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
+            ply.ScreamLoop = nil
+
+            ply:SetNWBool( "TheOrb_IsGazing", false )
+            ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
         end
 
         return
     end
 
-    if currentIsOrb then
-        ply.OrbTargeted = currentTarget
-        ply.StartedGazing = CurTime()
-        ply:SetNWBool( "TheOrb_IsGazing", true )
+    if wasTargetingOrb and not isTargetingOrb then
+        -- Stopped looking at an orb
+        ply.TargetingOrb = nil
+        ply.StartedGazing = nil
+        ply.IsGazing = nil
+
+        if ply.OrbLocked then ply:UnLock() end
+        ply.OrbLocked = false
+
+        if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
+        ply.ScreamLoop = nil
+
+        ply:SetNWBool( "TheOrb_IsGazing", false )
+        ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+        return
     end
 
-    if not ply.OrbTargeted then return end
-
-    -- ply.OrbLocked = false
-    -- ply:StopLoopingSound( ply.ScreamLoop )
-    -- ply.ScreamLoop = nil
-    -- ply:Unlock()
-
+    if ( not wasTargetingOrb ) and isTargetingOrb then
+        -- Started looking at an orb
+        ply.TargetingOrb = target
+        ply.StartedGazing = CurTime()
+    end
 end
 
 hook.Add( "Think", "TheOrb_Think", function()
@@ -90,18 +136,15 @@ hook.Add( "Think", "TheOrb_Think", function()
 end )
 
 hook.Add( "PlayerSpawn", "TheOrb_PlayerReset", function( ply )
-    if ply.ZappedRagdoll then
+    if IsValid( ply.ZappedRagdoll ) then
         ply.ZappedRagdoll:Remove()
         ply.ZappedRagdoll = nil
     end
 
+    ply.GotZapped = false
     ply:UnSpectate()
 end )
 
 hook.Add( "CanPlayerSuicide", "TheOrb_PlayerLocked", function( ply )
-    local isGazing = ply:GetNWBool( "TheOrb_IsGazing", false )
-    if not isGazing then return end
-
-    local intensity = ply:GetNWFloat( "TheOrb_GazeIntensity", 0 )
-    if intensity >= 0.85 then return false end
+    if ply.OrbLocked then return false end
 end )

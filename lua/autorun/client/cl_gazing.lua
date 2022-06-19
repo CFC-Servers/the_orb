@@ -10,6 +10,9 @@ local peakVolume = 6
 local peakLightShake = 5
 local peakHeavyShake = 10
 
+-- TODO: Make this var shared somehow
+local maxGazeDuration = 21.15
+
 local baseTable = {
     ["$pp_colour_addr"] = 0,
     ["$pp_colour_addg"] = 0,
@@ -51,28 +54,51 @@ local function adjustForGaze( intensity )
 
     local myPos = LocalPlayer():GetPos()
 
-    if intensity >= 0.58 then
-        util_ScreenShake( myPos, peakLightShake, peakLightShake, 0.1, 0 )
+    if intensity >= 0.3 then
+        local shakeStrength = intensity * peakLightShake
+        util_ScreenShake( myPos, shakeStrength, shakeStrength / 2, 0.05, 0 )
     end
 
-    if intensity >= 0.91 then
-        util_ScreenShake( myPos, peakHeavyShake, peakHeavyShake, 0.1, 0 )
+    if intensity >= 0.95 then
+        local shakeStrength = intensity * peakHeavyShake
+        util_ScreenShake( myPos, shakeStrength, shakeStrength / 2, 0.1, 0 )
     end
 
 end
 
 local isGazing = false
 
+local function checkIsGazing()
+    local hasFlag = LocalPlayer():GetNWBool( "TheOrb_IsGazing", false )
+
+    local target = LocalPlayer():GetEyeTrace().Entity
+    local isLooking = target and target.IsOrb
+
+    return hasFlag and isLooking
+end
+
+local function gazeIntensity( ply )
+    ply = ply or LocalPlayer()
+    local started = ply:GetNWFloat( "TheOrb_StartedGazing", CurTime() )
+    if started == 0 then return 0 end
+
+    local diff = CurTime() - started
+    local intensity = diff / maxGazeDuration
+
+    return intensity
+end
+
 local function calcView( _, pos, angles, fov )
     if not isGazing then
+        print( "Not gazing, removing hook" )
         hook.Remove( "CalcView", "TheOrb_Gazing" )
         return
     end
 
-    local intensity = LocalPlayer():GetNWFloat( "TheOrb_GazeIntensity", 0 )
+    local intensity = gazeIntensity()
 
     local newFov = fov * ( 1 - intensity )
-    newFov = math_max( 15, newFov )
+    newFov = math_max( 10, newFov )
 
     local view = {
         origin = pos,
@@ -91,11 +117,12 @@ local function screenEffects()
     end
 
     _G.DrawColorModify( currentTable )
-    local intensity = LocalPlayer():GetNWFloat( "TheOrb_GazeIntensity", 0 )
+    local intensity = gazeIntensity()
     local sobel = 1.5 - intensity
     _G.DrawSobel( sobel )
 end
 
+local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
     if skybox3d then return end
@@ -106,10 +133,11 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
         for i = 1, plyCount do
             local ply = rawget( plys, i )
             local plyIsGazing = ply:GetNWBool( "TheOrb_IsGazing", false )
-            if plyIsGazing then
-                local intensity = ply:GetNWFloat( "TheOrb_GazeIntensity", 0 )
 
-                render.MaterialOverride( "models/XQM/LightLinesRed_tool" )
+            if plyIsGazing then
+                local intensity = gazeIntensity( ply )
+
+                render.MaterialOverride( linesMat )
                 render.SetBlend( intensity )
                 ply:DrawModel()
 
@@ -123,30 +151,26 @@ hook.Add( "CalcMainActivity", "TheOrb_Gazing", function( ply )
     local plyIsGazing = ply:GetNWBool( "TheOrb_IsGazing", false )
     if not plyIsGazing then return end
 
-    local intensity = ply:GetNWFloat( "TheOrb_GazeIntensity", 0 )
-    if intensity >= 0.2 then
-        return ACT_HL2MP_IDLE_ZOMBIE, nil
-    end
-
-    if intensity >= 0.85 then
-        return ACT_INVALID, nil
+    local intensity = gazeIntensity( ply )
+    if intensity >= 0.1 then
+        return ACT_HL2MP_IDLE_ZOMBIE, -1
     end
 end )
 
 local function gazeTick()
-    local target = LocalPlayer():GetEyeTrace().Entity
-    local targetingOrb = target and target:GetClass() == "the_orb"
+    local wasGazing = isGazing
+    local isNowGazing = checkIsGazing()
 
-    if ( not targetingOrb ) and ( not isGazing ) then return end
+    if not wasGazing and not isNowGazing then return end
 
-    if targetingOrb and isGazing then
-        local intensity = LocalPlayer():GetNWFloat( "TheOrb_GazeIntensity", 0 )
+    if wasGazing and isNowGazing then
+        local intensity = gazeIntensity()
         adjustForGaze( intensity )
         updateEffectTable( intensity )
         return
     end
 
-    if targetingOrb then
+    if isNowGazing then
         -- just started looking
         isGazing = true
         sound.PlayFile( "sound/the_orb/chant.mp3", "mono", function( audio )

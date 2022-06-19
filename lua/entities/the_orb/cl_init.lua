@@ -25,10 +25,11 @@ function ENT:PlayThunderSound( pos )
 
     sound_PlayFile( thunderPath, "3d", function( audio )
         if not IsValid( audio ) then return end
+        if not IsValid( self ) then return end
         table_insert( self.ThunderSounds, audio )
 
-        audio:Set3DFadeDistance( 400, 5000 )
-        audio:SetVolume( 2.75 )
+        audio:Set3DFadeDistance( 600, 8500 )
+        audio:SetVolume( 3 )
         audio:SetPos( pos, pos - self:GetPos() )
         audio:Play()
     end )
@@ -69,6 +70,9 @@ function ENT:MakeHitExplosion( pos )
 end
 
 function ENT:Zap( target )
+    if not IsValid( target ) then return end
+    if not IsValid( self ) then return end
+
     local targetPos = target:GetPos()
     self:PlayThunderSound( targetPos )
     self:PlaySparkSound( targetPos )
@@ -80,6 +84,7 @@ function ENT:StartZap( target )
     self:EmitSound( self.EmitOnZap, 75, 100, 1, CHAN_WEAPON )
     timer.Simple( math_Rand( 0.05, 0.2 ), function()
         if not IsValid( target ) then return end
+        if not IsValid( self ) then return end
         self:Zap( target )
     end )
 end

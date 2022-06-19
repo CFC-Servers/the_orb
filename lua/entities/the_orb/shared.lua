@@ -6,6 +6,7 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.Spawnable = true
 ENT.AdminOnly = false
 
+ENT.Material = "models/XQM/LightLinesRed_tool"
 ENT.Model = "models/hunter/misc/sphere1x1.mdl"
 ENT.IsOrb = true
 
@@ -28,12 +29,4 @@ function ENT:Initialize()
     self:SetMoveType( MOVETYPE_VPHYSICS )
     self:DrawShadow( false )
     self:PhysicsInit( SOLID_VPHYSICS )
-
-    if SERVER then
-        self:SetPos( self:GetPos() + self.SpawnOffset )
-        self:GetPhysicsObject():EnableMotion( false )
-        OrbManager:AddOrb( self )
-    end
-
-    self:Activate()
 end

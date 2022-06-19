@@ -18,11 +18,7 @@ local zaps = {}
 
 local function generateSegments( orb, target )
     local startPos = orb:GetPos()
-    local endPos = target:GetPos()
-
-    if target:IsPlayer() then
-        endPos = endPos + plyOffset
-    end
+    local endPos = target:NearestPoint( startPos )
 
     local segments = {}
     local segmentLength = 25
@@ -39,7 +35,7 @@ local function generateSegments( orb, target )
 
         local segmentOffset = Vector( 0, 0, 0 )
         if ( i ~= 1 ) and ( i ~= segmentCount ) then
-            local ziggy = math_random( 10, 30 )
+            local ziggy = math_random( 7, 22 )
             segmentOffset = VectorRand() * ziggy
         end
 
