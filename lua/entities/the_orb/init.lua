@@ -37,7 +37,8 @@ ENT.ZapClassBlacklist = {
     gmod_hands = true,
     base_entity = true,
     soundent = true,
-    bodyque = true
+    bodyque = true,
+    keyframe_rope = true
 }
 
 function ENT:SpawnFunction( ply, tr, className )
