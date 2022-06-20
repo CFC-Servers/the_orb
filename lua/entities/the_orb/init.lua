@@ -135,6 +135,7 @@ function ENT:MakePlayerRagdoll( ply )
 end
 
 function ENT:BroadcastZap( target )
+    if not IsValid( target ) then return end
     local recipients = RecipientFilter()
     recipients:AddPVS( target:GetPos() )
 
@@ -177,6 +178,7 @@ function ENT:Zap( target )
     end
 
     timer.Simple( 0.1, function()
+        if not IsValid( self ) then return end
         self:BroadcastZap( target )
     end )
 
@@ -188,6 +190,7 @@ function ENT:Zap( target )
     if target.IsOrb then return end
 
     timer.Simple( 0.4, function()
+        if not IsValid( self ) then return end
         if not IsValid( target ) then return end
         if target:IsPlayer() then
             target:UnLock()
