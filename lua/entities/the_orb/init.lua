@@ -52,8 +52,6 @@ function ENT:SpawnFunction( ply, tr, className )
     ent:SetOwner( ply )
     ent:SetPlayer( ply )
     ent:Spawn()
-    ent:Activate()
-    ent:GetPhysicsObject():EnableMotion( false )
 
     return ent
 end
