@@ -26,7 +26,14 @@ end
 
 function ENT:Initialize()
     self:SetModel( self.Model )
-    self:SetMoveType( MOVETYPE_VPHYSICS )
     self:DrawShadow( false )
+
+    if CLIENT then return end
+
     self:PhysicsInit( SOLID_VPHYSICS )
+    self:SetMoveType( MOVETYPE_VPHYSICS )
+    self:SetSolid( SOLID_VPHYSICS )
+    self:Activate()
+
+    self:GetPhysicsObject():EnableMotion( false )
 end
