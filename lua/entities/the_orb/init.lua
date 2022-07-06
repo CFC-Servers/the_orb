@@ -6,6 +6,7 @@ local IsValid = IsValid
 local rawget = rawget
 local StartWith = string.StartWith
 local math_random = math.random
+local math_min = math.min
 
 ENT.AutomaticFrameAdvance = true
 ENT.MaxZapsPerCheck = 4
@@ -246,4 +247,36 @@ function ENT:Think()
     self:NextThink( CurTime() )
 
     return true
+end
+
+local noAcfDamage = {
+    Damage = 0,
+    Overkill = 0,
+    Loss = 0,
+    Kill = false
+}
+function ENT:ACF_OnDamage( bullet )
+    local owner = bullet.Owner
+    local gun = bullet.Gun
+
+    if gun.GotZapped then return noAcfDamage end
+    if not IsValid( gun ) then return noAcfDamage end
+    gun.GotZapped = true
+
+    self:Zap( owner )
+    self:Zap( gun )
+
+    local build = constraint.GetAllConstrainedEntities( gun )
+    local buildCount = #build
+
+    local zapCount = math_min( buildCount / 4, 15 )
+    for _ = 1, zapCount do
+        local idx = math_random( 1, buildCount )
+        local ent = rawget( build, idx )
+
+        if not ent.GotZapped then
+            ent.GotZapped = true
+            self:Zap( ent )
+        end
+    end
 end
