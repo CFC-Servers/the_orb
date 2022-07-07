@@ -8,7 +8,7 @@ local StartWith = string.StartWith
 local math_random = math.random
 
 ENT.AutomaticFrameAdvance = true
-ENT.MaxZapsPerCheck = 4
+ENT.MaxZapsPerCheck = 12
 ENT.SpawnOffset = Vector( 0, 0, 150 )
 ENT.ExtraRagdollVelocity = Vector( 0, 0, 2250 )
 ENT.RagdollOptions = {
