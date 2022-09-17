@@ -195,8 +195,10 @@ local function gazeTick()
         hook.Remove( "RenderScreenspaceEffects", "TheOrb_Gazing" )
         timer.Remove( "TheOrb_DelayScreaming" )
 
-        chantSound:Stop()
-        chantSound = nil
+        if chantSound then
+            chantSound:Stop()
+            chantSound = nil
+        end
 
         screamSound:Stop()
     end
