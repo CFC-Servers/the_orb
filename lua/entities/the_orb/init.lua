@@ -163,8 +163,6 @@ function ENT:HandlePlayerZap( ply )
 end
 
 function ENT:Zap( target )
-    print( "Zapping:", target )
-
     local targetPhys = target:GetPhysicsObject()
     if IsValid( targetPhys ) then
         targetPhys:EnableMotion( false )

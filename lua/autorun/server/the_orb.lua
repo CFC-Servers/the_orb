@@ -52,6 +52,7 @@ local function handlePlayerView( ply )
                 ply.IsGazing = true
                 ply:SetNWBool( "TheOrb_IsGazing", true )
                 ply:SetNWFloat( "TheOrb_StartedGazing", CurTime() )
+                ply:SetNWEntity( "TheOrb_GazingAt", target )
             end
 
             if intensity >= 0.7 and not ply.OrbLocked then
@@ -78,6 +79,7 @@ local function handlePlayerView( ply )
                 timer.Simple( 0.15, function()
                     ply:SetNWBool( "TheOrb_IsGazing", false )
                     ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+                    ply:SetNWEntity( "TheOrb_GazingAt", nil )
                 end )
             end
 

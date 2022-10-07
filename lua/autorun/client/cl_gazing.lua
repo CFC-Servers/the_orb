@@ -148,8 +148,7 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
                 render.DrawBeam(
                     orb:GetPos(),
                     ply:GetPos() + Vector( 0, 0, 35 ),
-                    45, math.Rand( 0, 3 ), math.Rand( 0, 4 ),
-                    Color( 255, 255, 255, 255 * intensity )
+                    45, math.Rand( 0, 3 ), math.Rand( 0, 4 )
                 )
             end
         end
