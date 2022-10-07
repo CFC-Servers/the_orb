@@ -90,7 +90,6 @@ end
 
 local function calcView( _, pos, angles, fov )
     if not isGazing then
-        print( "Not gazing, removing hook" )
         hook.Remove( "CalcView", "TheOrb_Gazing" )
         return
     end
@@ -122,7 +121,9 @@ local function screenEffects()
     _G.DrawSobel( sobel )
 end
 
+local beamMat = Material( "models/effects/portalrift_sheet" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
+
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
     if skybox3d then return end
@@ -140,8 +141,16 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
                 render.MaterialOverride( linesMat )
                 render.SetBlend( intensity )
                 ply:DrawModel()
-
                 render.MaterialOverride( nil )
+
+                local orb = ply:GetEyeTrace().Entity
+                render.SetMaterial( beamMat )
+                render.DrawBeam(
+                    orb:GetPos(),
+                    ply:GetPos() + Vector( 0, 0, 35 ),
+                    45, math.Rand( 0, 3 ), math.Rand( 0, 4 ),
+                    Color( 255, 255, 255, 255 * intensity )
+                )
             end
         end
     cam.End3D()
