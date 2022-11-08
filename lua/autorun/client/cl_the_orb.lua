@@ -18,7 +18,7 @@ local zaps = {}
 
 function generateSegments( orb, target, segmentMod, ziggyMod )
     local startPos = orb:GetPos()
-    local endPos = target:NearestPoint( startPos )
+    local endPos = target:WorldSpaceCenter()
 
     segmentMod = segmentMod or 1
     ziggyMod = ziggyMod or 1

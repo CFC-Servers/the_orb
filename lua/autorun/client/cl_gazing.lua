@@ -4,12 +4,15 @@ local rawget = rawget
 local rawset = rawset
 
 local math_max = math.max
-local math_Rand = math.Rand
 
-local render_DrawBeam = render.DrawBeam
+local render_StartBeam = render.StartBeam
+local render_AddBeam = render.AddBeam
+local render_EndBeam = render.EndBeam
 local render_SetMaterial = render.SetMaterial
 local render_MaterialOverride = render.MaterialOverride
 local render_SetBlend = render.SetBlend
+local render_SetShadowsDisabled = render.SetShadowsDisabled
+local render_SetLightingMode = render.SetLightingMode
 
 local peakBrightness = -0.5
 local peakContrast = 2.35
@@ -36,6 +39,7 @@ local currentTable = table.Copy( baseTable )
 
 local chantSound
 local screamSound
+local ourOrb
 
 
 local function updateEffectTable( intensity )
@@ -70,18 +74,19 @@ local function adjustForGaze( intensity )
         local shakeStrength = intensity * peakHeavyShake
         util_ScreenShake( myPos, shakeStrength, shakeStrength / 2, 0.1, 0 )
     end
-
 end
 
 local isGazing = false
 
 local function checkIsGazing()
     local hasFlag = LocalPlayer():GetNW2Bool( "TheOrb_IsGazing" )
-
     local target = LocalPlayer():GetEyeTrace().Entity
     local isLooking = target and target.IsOrb
 
-    return hasFlag and isLooking
+    local gazing = hasFlag and isLooking
+    if gazing then ourOrb = target end
+
+    return gazing
 end
 
 local function gazeIntensity( ply )
@@ -128,7 +133,7 @@ local function screenEffects()
     _G.DrawSobel( sobel )
 end
 
-local beamMat = Material( "models/effects/portalrift_sheet" )
+local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
@@ -152,15 +157,48 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
 
                 local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
                 if IsValid( orb ) then
-                    local segments = generateSegments( orb, ply, 0.3, 0.2 )
+                    local segments = generateSegments( orb, ply, 0.6, 0.35 )
                     local segmentCount = #segments
-                    local texStart, texEnd = math_Rand( 0, 3 ), math_Rand( 0, 4 )
 
+                    render_StartBeam( segmentCount )
                     render_SetMaterial( beamMat )
+
                     for j = 1, segmentCount do
                         local segment = rawget( segments, j )
-                        local lastPos = rawget( segments, j - 1 ) or segment
-                        render_DrawBeam( lastPos, segment, 45, texStart, texEnd )
+                        local distanceFromCenter
+                        if j > segmentCount / 2 then
+                            distanceFromCenter = j - segmentCount / 2
+                        else
+                            distanceFromCenter = segmentCount / 2 - j
+                        end
+
+                        local beamWidth = 2 + ( 30 - distanceFromCenter )
+
+                        render_AddBeam( segment, beamWidth, j / segmentCount )
+                    end
+                    render_EndBeam()
+
+                    if ply == LocalPlayer() then
+                        local blend = render.GetBlend()
+                        render_SetLightingMode( 1 )
+                        render.SuppressEngineLighting( true )
+
+                        render_SetBlend( 1 - intensity )
+                        render_MaterialOverride( linesMat )
+                        orb:DrawModel()
+
+                        render_SetBlend( intensity / 2 )
+                        render_MaterialOverride( "debug/env_cubemap_model" )
+                        orb:DrawModel()
+
+                        render_SetBlend( intensity )
+                        render_MaterialOverride( "pp/sunbeams" )
+                        orb:DrawModel()
+
+                        render_SetShadowsDisabled( true )
+                        render_SetLightingMode( 0 )
+                        render.SuppressEngineLighting( false )
+                        render_SetBlend( blend )
                     end
                 end
             end
@@ -206,12 +244,45 @@ local function gazeTick()
             screamSound:SetSoundLevel( 140 )
         end )
 
+        ourOrb:SetNoDraw( true )
+        ourOrb:DrawShadow( false )
+
+        local fogFunc = function( mod )
+            mod = mod or 1
+            render.FogMode( MATERIAL_FOG_LINEAR )
+
+            local intensity = gazeIntensity()
+
+            local fogStart, fogEnd
+
+            if intensity <= 0.25 then
+                fogStart = 85000 - math.Remap( intensity, 0, 0.25, 0, 80000 )
+                fogEnd = 100000 - math.Remap( intensity, 0, 0.25, 0, 93000 )
+            else
+                fogStart = 5000 - math.Remap( intensity, 0.25, 1, 0, 5000 )
+                fogEnd = 7000 - math.Remap( intensity, 0.25, 1, 0, 6000 )
+            end
+
+            print( fogStart, fogEnd )
+
+            render.FogStart( fogStart * mod )
+            render.FogEnd( fogEnd * mod )
+            render.FogMaxDensity( math.Remap( intensity, 0, 1, 0.75, 0.9 ) )
+            render.FogColor( 125, 15, 15 )
+            return true
+        end
+
+        hook.Add( "SetupWorldFog", "TheOrb_Gazing", fogFunc )
+        hook.Add( "SetupSkyboxFog", "TheOrb_Gazing", fogFunc )
         hook.Add( "CalcView", "TheOrb_Gazing", calcView )
         hook.Add( "RenderScreenspaceEffects", "TheOrb_Gazing", screenEffects )
+
     else
         -- just looked away
         isGazing = false
 
+        hook.Remove( "SetupWorldFog", "TheOrb_Gazing" )
+        hook.Remove( "SetupSkyboxFog", "TheOrb_Gazing" )
         hook.Remove( "CalcView", "TheOrb_Gazing" )
         hook.Remove( "RenderScreenspaceEffects", "TheOrb_Gazing" )
         timer.Remove( "TheOrb_DelayScreaming" )
@@ -222,10 +293,19 @@ local function gazeTick()
         end
 
         screamSound:Stop()
+
+        if ourOrb then
+            ourOrb:SetNoDraw( false )
+            ourOrb:DrawShadow( true )
+            ourOrb = nil
+        end
     end
 end
 
-hook.Add( "InitPostEntity", "TheOrb_Setup", function()
+hook.Add( "Tick", "TheOrb_Setup", function()
+    if not LocalPlayer then return end
+    hook.Remove( "Tick", "TheOrb_Setup" )
+
     screamSound = CreateSound( LocalPlayer(), "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
     screamSound:Stop()
 
