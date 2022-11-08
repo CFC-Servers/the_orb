@@ -50,9 +50,9 @@ local function handlePlayerView( ply )
             if not ply.IsGazing then
                 -- Is now considered gazing
                 ply.IsGazing = true
-                ply:SetNWBool( "TheOrb_IsGazing", true )
-                ply:SetNWFloat( "TheOrb_StartedGazing", CurTime() )
-                ply:SetNWEntity( "TheOrb_GazingAt", target )
+                ply:SetNW2Bool( "TheOrb_IsGazing", true )
+                ply:SetNW2Float( "TheOrb_StartedGazing", CurTime() )
+                ply:SetNW2Entity( "TheOrb_GazingAt", target )
             end
 
             if intensity >= 0.7 and not ply.OrbLocked then
@@ -77,9 +77,9 @@ local function handlePlayerView( ply )
                 ply.ScreamLoop = nil
 
                 timer.Simple( 0.15, function()
-                    ply:SetNWBool( "TheOrb_IsGazing", false )
-                    ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
-                    ply:SetNWEntity( "TheOrb_GazingAt", nil )
+                    ply:SetNW2Bool( "TheOrb_IsGazing", false )
+                    ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
+                    ply:SetNW2Entity( "TheOrb_GazingAt", nil )
                 end )
             end
 
@@ -96,8 +96,8 @@ local function handlePlayerView( ply )
             if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
             ply.ScreamLoop = nil
 
-            ply:SetNWBool( "TheOrb_IsGazing", false )
-            ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+            ply:SetNW2Bool( "TheOrb_IsGazing", false )
+            ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
         end
 
         return
@@ -115,8 +115,8 @@ local function handlePlayerView( ply )
         if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
         ply.ScreamLoop = nil
 
-        ply:SetNWBool( "TheOrb_IsGazing", false )
-        ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+        ply:SetNW2Bool( "TheOrb_IsGazing", false )
+        ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
         return
     end
 

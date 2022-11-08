@@ -1,8 +1,15 @@
 local util_ScreenShake = util.ScreenShake
 local IsValid = IsValid
+local rawget = rawget
 local rawset = rawset
 
 local math_max = math.max
+local math_Rand = math.Rand
+
+local render_DrawBeam = render.DrawBeam
+local render_SetMaterial = render.SetMaterial
+local render_MaterialOverride = render.MaterialOverride
+local render_SetBlend = render.SetBlend
 
 local peakBrightness = -0.5
 local peakContrast = 2.35
@@ -59,7 +66,7 @@ local function adjustForGaze( intensity )
         util_ScreenShake( myPos, shakeStrength, shakeStrength / 2, 0.05, 0 )
     end
 
-    if intensity >= 0.95 then
+    if intensity >= 0.89 then
         local shakeStrength = intensity * peakHeavyShake
         util_ScreenShake( myPos, shakeStrength, shakeStrength / 2, 0.1, 0 )
     end
@@ -69,7 +76,7 @@ end
 local isGazing = false
 
 local function checkIsGazing()
-    local hasFlag = LocalPlayer():GetNWBool( "TheOrb_IsGazing", false )
+    local hasFlag = LocalPlayer():GetNW2Bool( "TheOrb_IsGazing" )
 
     local target = LocalPlayer():GetEyeTrace().Entity
     local isLooking = target and target.IsOrb
@@ -79,7 +86,7 @@ end
 
 local function gazeIntensity( ply )
     ply = ply or LocalPlayer()
-    local started = ply:GetNWFloat( "TheOrb_StartedGazing", CurTime() )
+    local started = ply:GetNW2Float( "TheOrb_StartedGazing", CurTime() )
     if started == 0 then return 0 end
 
     local diff = CurTime() - started
@@ -133,30 +140,36 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
     cam.Start3D()
         for i = 1, plyCount do
             local ply = rawget( plys, i )
-            local plyIsGazing = ply:GetNWBool( "TheOrb_IsGazing", false )
+            local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing" )
 
             if plyIsGazing then
                 local intensity = gazeIntensity( ply )
 
-                render.MaterialOverride( linesMat )
-                render.SetBlend( intensity )
+                render_MaterialOverride( linesMat )
+                render_SetBlend( intensity )
                 ply:DrawModel()
-                render.MaterialOverride( nil )
+                render_MaterialOverride( nil )
 
-                local orb = ply:GetEyeTrace().Entity
-                render.SetMaterial( beamMat )
-                render.DrawBeam(
-                    orb:GetPos(),
-                    ply:GetPos() + Vector( 0, 0, 35 ),
-                    45, math.Rand( 0, 3 ), math.Rand( 0, 4 )
-                )
+                local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
+                if IsValid( orb ) then
+                    local segments = generateSegments( orb, ply, 0.3, 0.2 )
+                    local segmentCount = #segments
+                    local texStart, texEnd = math_Rand( 0, 3 ), math_Rand( 0, 4 )
+
+                    render_SetMaterial( beamMat )
+                    for j = 1, segmentCount do
+                        local segment = rawget( segments, j )
+                        local lastPos = rawget( segments, j - 1 ) or segment
+                        render_DrawBeam( lastPos, segment, 45, texStart, texEnd )
+                    end
+                end
             end
         end
     cam.End3D()
 end )
 
 hook.Add( "CalcMainActivity", "TheOrb_Gazing", function( ply )
-    local plyIsGazing = ply:GetNWBool( "TheOrb_IsGazing", false )
+    local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing", false )
     if not plyIsGazing then return end
 
     local intensity = gazeIntensity( ply )
@@ -212,7 +225,7 @@ local function gazeTick()
     end
 end
 
-hook.Add( "InitPostEntity", "TheOrb_Setup",function()
+hook.Add( "InitPostEntity", "TheOrb_Setup", function()
     screamSound = CreateSound( LocalPlayer(), "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
     screamSound:Stop()
 

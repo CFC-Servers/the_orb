@@ -52,7 +52,7 @@ function ENT:MakeFlash( pos )
     light.g = col[2]
     light.b = col[3]
     light.Brightness = 8.75
-    light.Size = self:GetRadius()
+    light.Size = self:GetRadius() * 2
     light.DieTime = CurTime() + 0.75
     light.Decay = 750
 end
