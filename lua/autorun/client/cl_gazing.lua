@@ -3,22 +3,38 @@ local IsValid = IsValid
 local rawget = rawget
 local rawset = rawset
 
+local table_insert = table.insert
+
 local math_max = math.max
+local math_rad = math.rad
+local math_sin = math.sin
+local math_cos = math.cos
+local math_Rand = math.Rand
 
 local render_StartBeam = render.StartBeam
 local render_AddBeam = render.AddBeam
 local render_EndBeam = render.EndBeam
 local render_SetMaterial = render.SetMaterial
 local render_MaterialOverride = render.MaterialOverride
+local render_GetBlend = render.GetBlend
 local render_SetBlend = render.SetBlend
-local render_SetShadowsDisabled = render.SetShadowsDisabled
-local render_SetLightingMode = render.SetLightingMode
 
-local peakBrightness = -0.5
-local peakContrast = 2.35
+local surface_SetMaterial = surface.SetMaterial
+local surface_GetAlphaMultiplier = surface.GetAlphaMultiplier
+local surface_SetAlphaMultiplier = surface.SetAlphaMultiplier
+local surface_DrawPoly = surface.DrawPoly
+
+local cam_Start3D2D = cam.Start3D2D
+local cam_End3D2D = cam.End3D2D
+
+local peakBrightness = -0.15
+local peakContrast = 2
 local peakVolume = 6
 local peakLightShake = 5
 local peakHeavyShake = 10
+local overlayMat = Material( "effects/tp_eyefx/tpeye2" )
+local beamMat = Material( "effects/tp_eyefx/tpeye" )
+local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 
 -- TODO: Make this var shared somehow
 local maxGazeDuration = 21.15
@@ -41,6 +57,49 @@ local chantSound
 local screamSound
 local ourOrb
 
+local function drawCircle( x, y, radius, seg, intensity )
+    intensity = intensity / 2
+    local cir = {}
+
+    table_insert( cir, { x = x, y = y, u = 0.5, v = 0.5 } )
+    for i = 0, seg do
+        local a = math_rad( ( i / seg ) * -360 )
+        table_insert( cir, {
+            x = ( x + math_Rand( -intensity, intensity ) ) + math_sin( a ) * radius,
+            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius,
+            u = math_sin( a ) / 2 + 0.5,
+            v = math_cos( a ) / 2 + 0.5
+        } )
+    end
+
+    local a = math_rad( 0 )
+    table_insert( cir, {
+        x = x + math_sin( a ) * radius,
+        y = y + math_cos( a ) * radius,
+        u = math_sin( a ) / 2 + 0.5,
+        v = math_cos( a ) / 2 + 0.5
+    } )
+
+    surface_DrawPoly( cir )
+end
+
+local function drawOrbOverlay( orb, intensity )
+    local displacement = orb:GetPos() - LocalPlayer():EyePos()
+    local right        = displacement:Angle():Right()
+    local surfacePos = orb:GetPos() - displacement:GetNormalized() * orb:BoundingRadius()
+    local surfaceAng = displacement:Cross( right ):Angle()
+
+    cam_Start3D2D( surfacePos, surfaceAng, 1 )
+
+    local alpha = surface_GetAlphaMultiplier()
+    surface.SetDrawColor( 255, 255, 255, 255 * intensity )
+    surface_SetMaterial( overlayMat )
+    surface_SetAlphaMultiplier( intensity )
+    drawCircle( 0, 0, 20 * intensity, ( 220 * intensity ) + 20, intensity )
+    surface_SetAlphaMultiplier( alpha )
+
+    cam_End3D2D()
+end
 
 local function updateEffectTable( intensity )
     local brightness = peakBrightness * intensity
@@ -49,7 +108,7 @@ local function updateEffectTable( intensity )
     local contrast = 1 + ( peakContrast * intensity )
     rawset( currentTable, "$pp_colour_contrast", contrast )
 
-    local color = 1 - intensity
+    local color = math.max( 0.25, 1 - intensity )
     rawset( currentTable, "$pp_colour_colour", color )
 end
 
@@ -133,8 +192,21 @@ local function screenEffects()
     _G.DrawSobel( sobel )
 end
 
-local beamMat = Material( "effects/tp_eyefx/tpeye" )
-local linesMat = Material( "models/XQM/LightLinesRed_tool" )
+local orbMat = CreateMaterial( "THEORB", "UnlitGeneric", {
+    ["$basetexture"] = "models/xqm/lightlinesred",
+    ["$detail"] = "maxofs2d/terrain_detail",
+    ["$surfaceprop"] = "metal",
+    ["$bumpmap"] = "models/xqm/lightlinesred_normal",
+    ["$phong"] = 1,
+    ["$phongexponent"] = 30,
+    ["$phongboost"] = 2,
+    ["$phongfresnelranges"] = Vector( 0.05, 0.6, 1 ),
+    ["$nofog"] = 1,
+    ["$model"] = 1,
+    ["$ignorez"] = 1,
+    ["$flags"] = 134219840,
+    ["$flags2"] = 262226,
+} )
 
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
@@ -143,20 +215,32 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
     local plyCount = #plys
 
     cam.Start3D()
-        for i = 1, plyCount do
-            local ply = rawget( plys, i )
-            local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing" )
+    for i = 1, plyCount do
+        local ply = rawget( plys, i )
+        local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing" )
 
-            if plyIsGazing then
-                local intensity = gazeIntensity( ply )
+        if plyIsGazing then
+            local intensity = gazeIntensity( ply )
+            local blend = render_GetBlend()
 
-                render_MaterialOverride( linesMat )
-                render_SetBlend( intensity )
-                ply:DrawModel()
-                render_MaterialOverride( nil )
+            render_SetBlend( intensity )
+            render_MaterialOverride( linesMat )
+            ply:DrawModel()
+            render_MaterialOverride()
+            render_SetBlend( blend )
 
-                local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
-                if IsValid( orb ) then
+            local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
+            if IsValid( orb ) then
+                if ply == LocalPlayer() then
+                    -- blend = render.GetBlend()
+                    -- render_MaterialOverride( orbMat )
+                    -- render_SetBlend( intensity )
+                    -- orb:DrawModel()
+                    -- render_MaterialOverride()
+                    -- render_SetBlend( blend )
+
+                    drawOrbOverlay( orb, intensity )
+                else
                     local segments = generateSegments( orb, ply, 0.6, 0.35 )
                     local segmentCount = #segments
 
@@ -177,32 +261,10 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
                         render_AddBeam( segment, beamWidth, j / segmentCount )
                     end
                     render_EndBeam()
-
-                    if ply == LocalPlayer() then
-                        local blend = render.GetBlend()
-                        render_SetLightingMode( 1 )
-                        render.SuppressEngineLighting( true )
-
-                        render_SetBlend( 1 - intensity )
-                        render_MaterialOverride( linesMat )
-                        orb:DrawModel()
-
-                        render_SetBlend( intensity / 2 )
-                        render_MaterialOverride( "debug/env_cubemap_model" )
-                        orb:DrawModel()
-
-                        render_SetBlend( intensity )
-                        render_MaterialOverride( "pp/sunbeams" )
-                        orb:DrawModel()
-
-                        render_SetShadowsDisabled( true )
-                        render_SetLightingMode( 0 )
-                        render.SuppressEngineLighting( false )
-                        render_SetBlend( blend )
-                    end
                 end
             end
         end
+    end
     cam.End3D()
 end )
 
@@ -244,9 +306,6 @@ local function gazeTick()
             screamSound:SetSoundLevel( 140 )
         end )
 
-        ourOrb:SetNoDraw( true )
-        ourOrb:DrawShadow( false )
-
         local fogFunc = function( mod )
             mod = mod or 1
             render.FogMode( MATERIAL_FOG_LINEAR )
@@ -255,20 +314,18 @@ local function gazeTick()
 
             local fogStart, fogEnd
 
-            if intensity <= 0.25 then
-                fogStart = 85000 - math.Remap( intensity, 0, 0.25, 0, 80000 )
-                fogEnd = 100000 - math.Remap( intensity, 0, 0.25, 0, 93000 )
+            if intensity <= 0.15 then
+                fogStart = 85000 - math.Remap( intensity, 0, 0.15, 0, 80000 )
+                fogEnd = 100000 - math.Remap( intensity, 0, 0.15, 0, 93000 )
             else
                 fogStart = 5000 - math.Remap( intensity, 0.25, 1, 0, 5000 )
                 fogEnd = 7000 - math.Remap( intensity, 0.25, 1, 0, 6000 )
             end
 
-            print( fogStart, fogEnd )
-
             render.FogStart( fogStart * mod )
             render.FogEnd( fogEnd * mod )
             render.FogMaxDensity( math.Remap( intensity, 0, 1, 0.75, 0.9 ) )
-            render.FogColor( 125, 15, 15 )
+            render.FogColor( 35, 0, 0 )
             return true
         end
 
@@ -295,19 +352,17 @@ local function gazeTick()
         screamSound:Stop()
 
         if ourOrb then
-            ourOrb:SetNoDraw( false )
-            ourOrb:DrawShadow( true )
             ourOrb = nil
         end
     end
 end
 
-hook.Add( "Tick", "TheOrb_Setup", function()
-    if not LocalPlayer then return end
-    hook.Remove( "Tick", "TheOrb_Setup" )
-
+function setupOrbGazing()
     screamSound = CreateSound( LocalPlayer(), "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
     screamSound:Stop()
 
     hook.Add( "Tick", "TheOrb_Gazing", gazeTick )
-end )
+end
+
+
+hook.Add( "InitPostEntity", "TheOrb_Setup", setupOrbGazing )
