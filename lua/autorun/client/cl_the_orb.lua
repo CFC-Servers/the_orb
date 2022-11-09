@@ -12,7 +12,7 @@ local render_DrawBeam = render.DrawBeam
 
 local zapMat = Material( "cable/redlaser" )
 local zapLifetime = 1
-local baseWidth = 45
+local baseWidth = 60
 local plyOffset = Vector( 0, 0, 45 )
 local zaps = {}
 
@@ -24,7 +24,7 @@ function generateSegments( orb, target, segmentMod, ziggyMod )
     ziggyMod = ziggyMod or 1
 
     local segments = {}
-    local segmentLength = 25
+    local segmentLength = 50
     local segmentCount = math_ceil( startPos:Distance( endPos ) / segmentLength ) + 2
     segmentCount = segmentCount * segmentMod
 

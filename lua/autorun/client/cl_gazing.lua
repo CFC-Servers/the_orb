@@ -20,21 +20,23 @@ local render_GetBlend = render.GetBlend
 local render_SetBlend = render.SetBlend
 
 local surface_SetMaterial = surface.SetMaterial
-local surface_GetAlphaMultiplier = surface.GetAlphaMultiplier
-local surface_SetAlphaMultiplier = surface.SetAlphaMultiplier
+local surface_SetDrawColor = surface.SetDrawColor
 local surface_DrawPoly = surface.DrawPoly
 
 local cam_Start3D2D = cam.Start3D2D
 local cam_End3D2D = cam.End3D2D
 
-local peakBrightness = -0.15
-local peakContrast = 2
-local peakVolume = 6
-local peakLightShake = 5
-local peakHeavyShake = 10
-local overlayMat = Material( "effects/tp_eyefx/tpeye2" )
+local peakBrightness = -0.65
+local peakContrast = 1.25
+local peakVolume = 7
+local peakLightShake = 6
+local peakHeavyShake = 8
 local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
+local sunMat = Material( "effects/lensflare/flare" )
+local centerMat = Material( "effects/tp_eyefx/tpeye2" )
+local centerMat2 = Material( "effects/tp_eyefx/tpeye" )
+-- local fuzzyMat = Material( "effects/flashlight/caustics" )
 
 -- TODO: Make this var shared somehow
 local maxGazeDuration = 21.15
@@ -55,10 +57,11 @@ local currentTable = table.Copy( baseTable )
 
 local chantSound
 local screamSound
+local passiveNoise
 local ourOrb
 
-local function drawCircle( x, y, radius, seg, intensity )
-    intensity = intensity / 2
+local function makeCircle( x, y, radius, seg, intensity )
+    intensity = intensity * 1.75
     local cir = {}
 
     table_insert( cir, { x = x, y = y, u = 0.5, v = 0.5 } )
@@ -66,7 +69,7 @@ local function drawCircle( x, y, radius, seg, intensity )
         local a = math_rad( ( i / seg ) * -360 )
         table_insert( cir, {
             x = ( x + math_Rand( -intensity, intensity ) ) + math_sin( a ) * radius,
-            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius,
+            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius * 1.5,
             u = math_sin( a ) / 2 + 0.5,
             v = math_cos( a ) / 2 + 0.5
         } )
@@ -80,7 +83,7 @@ local function drawCircle( x, y, radius, seg, intensity )
         v = math_cos( a ) / 2 + 0.5
     } )
 
-    surface_DrawPoly( cir )
+    return cir
 end
 
 local function drawOrbOverlay( orb, intensity )
@@ -89,26 +92,49 @@ local function drawOrbOverlay( orb, intensity )
     local surfacePos = orb:GetPos() - displacement:GetNormalized() * orb:BoundingRadius()
     local surfaceAng = displacement:Cross( right ):Angle()
 
+    local function getCircle( scaleMod )
+        scaleMod = scaleMod or 1
+        return makeCircle( 0, 0, ( scaleMod * 22 ) * intensity, ( 150 * intensity ) + 75, intensity )
+    end
+
     cam_Start3D2D( surfacePos, surfaceAng, 1 )
 
-    local alpha = surface_GetAlphaMultiplier()
-    surface.SetDrawColor( 255, 255, 255, 255 * intensity )
-    surface_SetMaterial( overlayMat )
-    surface_SetAlphaMultiplier( intensity )
-    drawCircle( 0, 0, 20 * intensity, ( 220 * intensity ) + 20, intensity )
-    surface_SetAlphaMultiplier( alpha )
+    surface_SetMaterial( sunMat )
+    if intensity < 0.88 then
+        local circle = getCircle( 6 )
+        surface_SetDrawColor( 135, 135, 135, 255 )
+        surface_DrawPoly( circle )
+        surface_DrawPoly( circle )
+
+        circle = getCircle( 0.3 )
+        surface_SetMaterial( centerMat2 )
+        surface_DrawPoly( circle )
+    else
+        local circle = getCircle( 5 )
+        surface_SetDrawColor( 165, 0, 0, 255 )
+        surface_DrawPoly( circle )
+
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        surface_SetMaterial( centerMat )
+        circle = getCircle( 0.75 )
+        surface_DrawPoly( circle )
+        surface_DrawPoly( circle )
+    end
 
     cam_End3D2D()
 end
 
 local function updateEffectTable( intensity )
-    local brightness = peakBrightness * intensity
-    rawset( currentTable, "$pp_colour_brightness", brightness )
+    local isLocked = intensity > 0.88
 
-    local contrast = 1 + ( peakContrast * intensity )
+    local contrast = isLocked and 1.75 or 1 + ( peakContrast * intensity )
     rawset( currentTable, "$pp_colour_contrast", contrast )
 
-    local color = math.max( 0.25, 1 - intensity )
+    local brightness = isLocked and -0.45 or peakBrightness * intensity
+    rawset( currentTable, "$pp_colour_brightness", brightness )
+
+    local color = isLocked and 1 or math.max( 0.45, 1 - intensity )
+
     rawset( currentTable, "$pp_colour_colour", color )
 end
 
@@ -120,6 +146,10 @@ local function adjustForGaze( intensity )
 
     if screamSound:IsPlaying() then
         screamSound:ChangeVolume( intensity * peakVolume, 0 )
+    end
+
+    if passiveNoise:IsPlaying() then
+        passiveNoise:ChangeVolume( intensity * ( peakVolume / 4 ), 0 )
     end
 
     local myPos = LocalPlayer():GetPos()
@@ -188,25 +218,9 @@ local function screenEffects()
 
     _G.DrawColorModify( currentTable )
     local intensity = gazeIntensity()
-    local sobel = 1.5 - intensity
+    local sobel = 2 - intensity
     _G.DrawSobel( sobel )
 end
-
-local orbMat = CreateMaterial( "THEORB", "UnlitGeneric", {
-    ["$basetexture"] = "models/xqm/lightlinesred",
-    ["$detail"] = "maxofs2d/terrain_detail",
-    ["$surfaceprop"] = "metal",
-    ["$bumpmap"] = "models/xqm/lightlinesred_normal",
-    ["$phong"] = 1,
-    ["$phongexponent"] = 30,
-    ["$phongboost"] = 2,
-    ["$phongfresnelranges"] = Vector( 0.05, 0.6, 1 ),
-    ["$nofog"] = 1,
-    ["$model"] = 1,
-    ["$ignorez"] = 1,
-    ["$flags"] = 134219840,
-    ["$flags2"] = 262226,
-} )
 
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
@@ -260,6 +274,7 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
 
                         render_AddBeam( segment, beamWidth, j / segmentCount )
                     end
+
                     render_EndBeam()
                 end
             end
@@ -301,12 +316,23 @@ local function gazeTick()
             chantSound = audio
         end  )
 
+        screamSound = screamSound or CreateSound( LocalPlayer(), "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
+        screamSound:Stop()
+
+        passiveNoise = passiveNoise or CreateSound(
+            LocalPlayer(),
+            "synth/brown_noise.wav"
+        )
+        passiveNoise:PlayEx( 0.1, 100 )
+        passiveNoise:SetSoundLevel( 120 )
+
         timer.Create( "TheOrb_DelayScreaming", 8, 1, function()
             screamSound:PlayEx( 0.1, 100 )
             screamSound:SetSoundLevel( 140 )
         end )
 
         local fogFunc = function( mod )
+            do return end
             mod = mod or 1
             render.FogMode( MATERIAL_FOG_LINEAR )
 
@@ -329,20 +355,30 @@ local function gazeTick()
             return true
         end
 
+        LocalPlayer():SetDSP( 16 )
+
         hook.Add( "SetupWorldFog", "TheOrb_Gazing", fogFunc )
         hook.Add( "SetupSkyboxFog", "TheOrb_Gazing", fogFunc )
         hook.Add( "CalcView", "TheOrb_Gazing", calcView )
         hook.Add( "RenderScreenspaceEffects", "TheOrb_Gazing", screenEffects )
+        hook.Add( "PreDrawHalos", "TheOrb_Gazing", function()
+            halo.Add( { LocalPlayer():GetNW2Entity( "TheOrb_GazingAt" ) }, Color( 0, 0, 0 ), 2, 2, 8, false, true )
+        end )
+        hook.Add( "HUDShouldDraw", "TheOrb_Gazing", function()
+            return false
+        end )
 
     else
         -- just looked away
         isGazing = false
-
         hook.Remove( "SetupWorldFog", "TheOrb_Gazing" )
         hook.Remove( "SetupSkyboxFog", "TheOrb_Gazing" )
         hook.Remove( "CalcView", "TheOrb_Gazing" )
         hook.Remove( "RenderScreenspaceEffects", "TheOrb_Gazing" )
+        hook.Remove( "HUDShouldDraw", "TheOrb_Gazing" )
+        hook.Remove( "PreDrawHalos", "TheOrb_Gazing" )
         timer.Remove( "TheOrb_DelayScreaming" )
+        timer.Remove( "TheOrb_Bell" )
 
         if chantSound then
             chantSound:Stop()
@@ -350,6 +386,8 @@ local function gazeTick()
         end
 
         screamSound:Stop()
+        passiveNoise:Stop()
+        LocalPlayer():SetDSP( 0, true )
 
         if ourOrb then
             ourOrb = nil
@@ -357,12 +395,4 @@ local function gazeTick()
     end
 end
 
-function setupOrbGazing()
-    screamSound = CreateSound( LocalPlayer(), "ambient/levels/citadel/citadel_ambient_scream_loop1.wav" )
-    screamSound:Stop()
-
-    hook.Add( "Tick", "TheOrb_Gazing", gazeTick )
-end
-
-
-hook.Add( "InitPostEntity", "TheOrb_Setup", setupOrbGazing )
+hook.Add( "Tick", "TheOrb_Gazing", gazeTick )

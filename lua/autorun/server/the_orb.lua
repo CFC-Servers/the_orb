@@ -22,6 +22,52 @@ function OrbManager:RemoveOrb( orb )
     self.Orbs[orb] = nil
 end
 
+local function setWeapon( ply, orb )
+    if not IsValid( orb ) then return end
+    local weapon = ply:GetActiveWeapon()
+    if not IsValid( weapon ) then return end
+
+    local weaponClass = weapon:GetClass()
+    if weaponClass == "none" then return end
+
+    local newWeapon = ents.Create( weaponClass )
+    local pos = ply:EyePos()
+    local ang = ply:EyeAngles()
+    local forward = ang:Forward()
+    local offset = forward * 175
+    newWeapon:SetPos( pos + offset + Vector( 0, 0, 40 ) )
+    newWeapon:SetAngles( ang )
+    newWeapon:SetCollisionGroup( COLLISION_GROUP_DEBRIS )
+
+    function newWeapon:Think()
+        local orbPos = orb:GetPos()
+        local weaponPos = self:GetPos()
+        local dir = ( orbPos - weaponPos ):GetNormalized()
+        local speed = 1000
+        local vel = dir * speed
+
+        local phys = self:GetPhysicsObject()
+        if IsValid( phys ) then
+            phys:SetVelocity( vel )
+        end
+
+        timer.Simple( 0.1, function()
+            if IsValid( self ) then
+                self:Think()
+            end
+        end )
+    end
+
+
+    ply:Give( "none" )
+    ply:SelectWeapon( "none" )
+    ply:StripWeapon( weaponClass )
+
+    newWeapon:Spawn()
+    newWeapon:SetCollisionGroup( COLLISION_GROUP_DEBRIS )
+    newWeapon:Think()
+end
+
 -- TODO:
 -- the nwfloat "StartedGazing" means 'when the player passed the minGazeDuration threshold'
 -- but the ply.StartedGazing var means 'when the player originally looked at the orb'
@@ -53,6 +99,7 @@ local function handlePlayerView( ply )
                 ply:SetNW2Bool( "TheOrb_IsGazing", true )
                 ply:SetNW2Float( "TheOrb_StartedGazing", CurTime() )
                 ply:SetNW2Entity( "TheOrb_GazingAt", target )
+                setWeapon( ply, target )
             end
 
             if intensity >= 0.7 and not ply.OrbLocked then
@@ -124,8 +171,10 @@ local function handlePlayerView( ply )
         -- Started looking at an orb
         ply.TargetingOrb = target
         ply.StartedGazing = CurTime()
+
     end
 end
+
 
 hook.Add( "Think", "TheOrb_Think", function()
     local plys = player.GetAll()
@@ -135,6 +184,22 @@ hook.Add( "Think", "TheOrb_Think", function()
         local ply = rawget( plys, i )
         handlePlayerView( ply )
     end
+end )
+
+hook.Add( "EntityTakeDamage", "TheOrb_Revenge", function( ent, dmg )
+    if not ent.IsOrb then return end
+
+    local inflictor = dmg:GetInflictor()
+    if IsValid( inflictor ) then
+        ent:Zap( inflictor )
+    end
+
+    -- timer.Simple( 0.15, function()
+    --     local attacker = dmg:GetAttacker()
+    --     if IsValid( attacker ) then
+    --         ent:Zap( attacker )
+    --     end
+    -- end )
 end )
 
 hook.Add( "PlayerSpawn", "TheOrb_PlayerReset", function( ply )
@@ -149,4 +214,12 @@ end )
 
 hook.Add( "CanPlayerSuicide", "TheOrb_PlayerLocked", function( ply )
     if ply.OrbLocked then return false end
+end )
+
+hook.Add( "PlayerCanHearPlayersVoice", "TheOrb_PlayerLocked", function( _, talker )
+    if talker.OrbLocked then return false end
+end )
+
+hook.Add( "PlayerCanSeePlayersChat", "TheOrb_PlayerLocked", function( _, talker )
+    if talker.OrbLocked then return false end
 end )
