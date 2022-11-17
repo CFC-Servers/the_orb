@@ -12,17 +12,25 @@ local render_DrawBeam = render.DrawBeam
 
 local zapMat = Material( "cable/redlaser" )
 local zapLifetime = 1
-local baseWidth = 45
+local baseWidth = 60
 local plyOffset = Vector( 0, 0, 45 )
+local plyNegativeOffset = Vector( 0, 0, 10 )
 local zaps = {}
 
-local function generateSegments( orb, target )
+function generateSegments( orb, target, segmentMod, ziggyMod )
     local startPos = orb:GetPos()
-    local endPos = target:NearestPoint( startPos )
+    local endPos = target:WorldSpaceCenter()
+    if target:IsPlayer() then
+        endPos = target:EyePos() - plyNegativeOffset
+    end
+
+    segmentMod = segmentMod or 1
+    ziggyMod = ziggyMod or 1
 
     local segments = {}
-    local segmentLength = 25
+    local segmentLength = 50
     local segmentCount = math_ceil( startPos:Distance( endPos ) / segmentLength ) + 2
+    segmentCount = segmentCount * segmentMod
 
     for i = 1, segmentCount do
         local t = i / segmentCount
@@ -36,13 +44,14 @@ local function generateSegments( orb, target )
         local segmentOffset = Vector( 0, 0, 0 )
         if ( i ~= 1 ) and ( i ~= segmentCount ) then
             local ziggy = math_random( 7, 22 )
+            ziggy = ziggy * ziggyMod
             segmentOffset = VectorRand() * ziggy
         end
 
         table_insert( segments, lerpedPos + segmentOffset )
     end
 
-    table_insert( zaps, { segments = segments, created = CurTime() } )
+    return segments
 end
 
 local function drawZaps()
@@ -81,7 +90,8 @@ net.Receive( "TheOrb_Zap", function()
     local target = net.ReadEntity()
     if not IsValid( target ) then return end
 
-    generateSegments( orb, target )
+    local segments = generateSegments( orb, target )
+    table_insert( zaps, { segments = segments, created = CurTime() } )
 
     local targetPos = target:GetPos()
 

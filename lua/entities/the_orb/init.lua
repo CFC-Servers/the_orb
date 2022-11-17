@@ -7,9 +7,11 @@ local rawget = rawget
 local StartWith = string.StartWith
 local math_random = math.random
 
+local blastOffset = Vector( 0, 0, 25 )
+
 ENT.AutomaticFrameAdvance = true
 ENT.MaxZapsPerCheck = 12
-ENT.SpawnOffset = Vector( 0, 0, 150 )
+ENT.SpawnOffset = Vector( 0, 0, 50 )
 ENT.ExtraRagdollVelocity = Vector( 0, 0, 2250 )
 ENT.RagdollOptions = {
     "models/Humans/Charple01.mdl",
@@ -151,7 +153,7 @@ function ENT:HandlePlayerZap( ply )
     dmg:SetAttacker( owner )
     dmg:SetInflictor( self )
     dmg:SetDamageType( DMG_SHOCK + DMG_ENERGYBEAM )
-    dmg:SetDamage( 10000 )
+    dmg:SetDamage( 55000 )
     dmg:SetDamagePosition( plyPos )
     dmg:SetReportedPosition( plyPos )
 
@@ -182,7 +184,7 @@ function ENT:Zap( target )
     local targetPos = target:GetPos()
     local normal = ( self:GetPos() - targetPos ):GetNormal()
 
-    util.ScreenShake( targetPos, 2, 5, 1, 750 )
+    util.ScreenShake( targetPos, 125, 25, 0.5, 1200 )
 
     if target.IsOrb then return end
 
@@ -200,8 +202,8 @@ function ENT:Zap( target )
         end
 
         local chance = math.random( 0, 100 )
-        if chance >= 70 then
-            ACF_HEKill( target, normal, 500, targetPos )
+        if chance >= 75 then
+            ACF_HEKill( target, normal, 25000, targetPos + blastOffset )
         else
             target:Remove()
         end

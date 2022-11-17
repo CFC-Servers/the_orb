@@ -22,6 +22,17 @@ function OrbManager:RemoveOrb( orb )
     self.Orbs[orb] = nil
 end
 
+local function setWeapon( ply, orb )
+    if not IsValid( orb ) then return end
+    local weapon = ply:GetActiveWeapon()
+    if not IsValid( weapon ) then return end
+
+    local weaponClass = weapon:GetClass()
+    if weaponClass == "none" then return end
+    ply:Give( "none" )
+    ply:SelectWeapon( "none" )
+end
+
 -- TODO:
 -- the nwfloat "StartedGazing" means 'when the player passed the minGazeDuration threshold'
 -- but the ply.StartedGazing var means 'when the player originally looked at the orb'
@@ -50,9 +61,10 @@ local function handlePlayerView( ply )
             if not ply.IsGazing then
                 -- Is now considered gazing
                 ply.IsGazing = true
-                ply:SetNWBool( "TheOrb_IsGazing", true )
-                ply:SetNWFloat( "TheOrb_StartedGazing", CurTime() )
-                ply:SetNWEntity( "TheOrb_GazingAt", target )
+                ply:SetNW2Bool( "TheOrb_IsGazing", true )
+                ply:SetNW2Float( "TheOrb_StartedGazing", CurTime() )
+                ply:SetNW2Entity( "TheOrb_GazingAt", target )
+                setWeapon( ply, target )
             end
 
             if intensity >= 0.7 and not ply.OrbLocked then
@@ -77,9 +89,9 @@ local function handlePlayerView( ply )
                 ply.ScreamLoop = nil
 
                 timer.Simple( 0.15, function()
-                    ply:SetNWBool( "TheOrb_IsGazing", false )
-                    ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
-                    ply:SetNWEntity( "TheOrb_GazingAt", nil )
+                    ply:SetNW2Bool( "TheOrb_IsGazing", false )
+                    ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
+                    ply:SetNW2Entity( "TheOrb_GazingAt", nil )
                 end )
             end
 
@@ -96,8 +108,8 @@ local function handlePlayerView( ply )
             if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
             ply.ScreamLoop = nil
 
-            ply:SetNWBool( "TheOrb_IsGazing", false )
-            ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+            ply:SetNW2Bool( "TheOrb_IsGazing", false )
+            ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
         end
 
         return
@@ -115,8 +127,8 @@ local function handlePlayerView( ply )
         if ply.ScreamLoop then ply:StopLoopingSound( ply.ScreamLoop ) end
         ply.ScreamLoop = nil
 
-        ply:SetNWBool( "TheOrb_IsGazing", false )
-        ply:SetNWFloat( "TheOrb_StartedGazing", 0 )
+        ply:SetNW2Bool( "TheOrb_IsGazing", false )
+        ply:SetNW2Float( "TheOrb_StartedGazing", 0 )
         return
     end
 
@@ -124,8 +136,10 @@ local function handlePlayerView( ply )
         -- Started looking at an orb
         ply.TargetingOrb = target
         ply.StartedGazing = CurTime()
+
     end
 end
+
 
 hook.Add( "Think", "TheOrb_Think", function()
     local plys = player.GetAll()
@@ -135,6 +149,22 @@ hook.Add( "Think", "TheOrb_Think", function()
         local ply = rawget( plys, i )
         handlePlayerView( ply )
     end
+end )
+
+hook.Add( "EntityTakeDamage", "TheOrb_Revenge", function( ent, dmg )
+    if not ent.IsOrb then return end
+
+    local inflictor = dmg:GetInflictor()
+    if IsValid( inflictor ) then
+        ent:Zap( inflictor )
+    end
+
+    -- timer.Simple( 0.15, function()
+    --     local attacker = dmg:GetAttacker()
+    --     if IsValid( attacker ) then
+    --         ent:Zap( attacker )
+    --     end
+    -- end )
 end )
 
 hook.Add( "PlayerSpawn", "TheOrb_PlayerReset", function( ply )
@@ -149,4 +179,12 @@ end )
 
 hook.Add( "CanPlayerSuicide", "TheOrb_PlayerLocked", function( ply )
     if ply.OrbLocked then return false end
+end )
+
+hook.Add( "PlayerCanHearPlayersVoice", "TheOrb_PlayerLocked", function( _, talker )
+    if talker.OrbLocked then return false end
+end )
+
+hook.Add( "PlayerCanSeePlayersChat", "TheOrb_PlayerLocked", function( _, talker )
+    if talker.OrbLocked then return false end
 end )
