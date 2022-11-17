@@ -14,11 +14,15 @@ local zapMat = Material( "cable/redlaser" )
 local zapLifetime = 1
 local baseWidth = 60
 local plyOffset = Vector( 0, 0, 45 )
+local plyNegativeOffset = Vector( 0, 0, 10 )
 local zaps = {}
 
 function generateSegments( orb, target, segmentMod, ziggyMod )
     local startPos = orb:GetPos()
     local endPos = target:WorldSpaceCenter()
+    if target:IsPlayer() then
+        endPos = target:EyePos() - plyNegativeOffset
+    end
 
     segmentMod = segmentMod or 1
     ziggyMod = ziggyMod or 1

@@ -18,6 +18,8 @@ local render_SetMaterial = render.SetMaterial
 local render_MaterialOverride = render.MaterialOverride
 local render_GetBlend = render.GetBlend
 local render_SetBlend = render.SetBlend
+local render_SetColorModulation = render.SetColorModulation
+local render_GetColorModulation = render.GetColorModulation
 
 local surface_SetMaterial = surface.SetMaterial
 local surface_SetDrawColor = surface.SetDrawColor
@@ -29,13 +31,22 @@ local cam_End3D2D = cam.End3D2D
 local peakBrightness = -0.65
 local peakContrast = 1.25
 local peakVolume = 7
-local peakLightShake = 6
-local peakHeavyShake = 8
+local peakLightShake = 4.5
+local peakHeavyShake = 4
+
+local bloomDarken = 1
+local bloomMultiply = 0
+local bloomColorMultiply = 1
+local bloomPasses = 1
+local bloomR = 0.25
+
 local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 local sunMat = Material( "effects/lensflare/flare" )
-local centerMat = Material( "effects/tp_eyefx/tpeye2" )
+--local centerMat = Material( "effects/tp_eyefx/tpeye2" )
+local centerMat = Material( "lights/hazzardred001a" )
 local centerMat2 = Material( "effects/tp_eyefx/tpeye" )
+local colorMat = Material( "models/debug/debugwhite" )
 -- local fuzzyMat = Material( "effects/flashlight/caustics" )
 
 -- TODO: Make this var shared somehow
@@ -69,7 +80,7 @@ local function makeCircle( x, y, radius, seg, intensity )
         local a = math_rad( ( i / seg ) * -360 )
         table_insert( cir, {
             x = ( x + math_Rand( -intensity, intensity ) ) + math_sin( a ) * radius,
-            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius * 1.5,
+            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius,
             u = math_sin( a ) / 2 + 0.5,
             v = math_cos( a ) / 2 + 0.5
         } )
@@ -99,25 +110,36 @@ local function drawOrbOverlay( orb, intensity )
 
     cam_Start3D2D( surfacePos, surfaceAng, 1 )
 
-    surface_SetMaterial( sunMat )
+    local circle
     if intensity < 0.88 then
-        local circle = getCircle( 6 )
+        circle = getCircle( 8 )
+        surface_SetMaterial( sunMat )
         surface_SetDrawColor( 135, 135, 135, 255 )
         surface_DrawPoly( circle )
         surface_DrawPoly( circle )
 
-        circle = getCircle( 0.3 )
         surface_SetMaterial( centerMat2 )
+        for _ = 1, 4 do
+            circle = getCircle( math.Rand( 0.1, 0.6 ) )
+            surface_DrawPoly( circle )
+        end
+
+        circle = getCircle( 0.1 * intensity )
+        surface_SetDrawColor( 0, 0, 0, 255 )
+        surface_SetMaterial( colorMat )
+        surface_DrawPoly( circle )
         surface_DrawPoly( circle )
     else
-        local circle = getCircle( 5 )
-        surface_SetDrawColor( 165, 0, 0, 255 )
-        surface_DrawPoly( circle )
-
-        surface_SetDrawColor( 255, 255, 255, 255 )
+        surface_SetDrawColor( 255, 5, 5, 255 )
         surface_SetMaterial( centerMat )
-        circle = getCircle( 0.75 )
-        surface_DrawPoly( circle )
+        for _ = 1, 8 do
+            circle = getCircle( math.Rand( 0.3, 0.65 ) )
+            surface_DrawPoly( circle )
+        end
+
+        circle = getCircle( 0.2 )
+        surface_SetDrawColor( 0, 0, 0, 255 )
+        surface_SetMaterial( colorMat )
         surface_DrawPoly( circle )
     end
 
@@ -127,15 +149,20 @@ end
 local function updateEffectTable( intensity )
     local isLocked = intensity > 0.88
 
-    local contrast = isLocked and 1.75 or 1 + ( peakContrast * intensity )
+    local contrast = isLocked and 1 or 1 + ( peakContrast * intensity )
     rawset( currentTable, "$pp_colour_contrast", contrast )
 
-    local brightness = isLocked and -0.45 or peakBrightness * intensity
+    local brightness = isLocked and ( peakBrightness * 0.25 ) or peakBrightness * intensity
     rawset( currentTable, "$pp_colour_brightness", brightness )
 
     local color = isLocked and 1 or math.max( 0.45, 1 - intensity )
-
     rawset( currentTable, "$pp_colour_colour", color )
+
+    bloomDarken = isLocked and 0.1 or 1 - ( 0.75 * intensity )
+    bloomMultiply = isLocked and 2.75 or 2 * intensity
+    bloomColorMultiply = 1.75 * intensity
+    bloomPasses = isLocked and 3 or 2 * intensity
+    bloomR = isLocked and 0.5 or intensity
 end
 
 local function adjustForGaze( intensity )
@@ -168,6 +195,7 @@ end
 local isGazing = false
 
 local function checkIsGazing()
+    if not IsValid( LocalPlayer() ) then return end
     local hasFlag = LocalPlayer():GetNW2Bool( "TheOrb_IsGazing" )
     local target = LocalPlayer():GetEyeTrace().Entity
     local isLooking = target and target.IsOrb
@@ -220,6 +248,12 @@ local function screenEffects()
     local intensity = gazeIntensity()
     local sobel = 2 - intensity
     _G.DrawSobel( sobel )
+
+    if intensity > 0.88 then
+        _G.DrawSharpen( 3, 2 )
+    else
+        _G.DrawBloom( bloomDarken, bloomMultiply, 12, 9, bloomPasses, bloomColorMultiply, bloomR, 0.25, 0.25 )
+    end
 end
 
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
@@ -246,12 +280,18 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
             local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
             if IsValid( orb ) then
                 if ply == LocalPlayer() then
-                    -- blend = render.GetBlend()
-                    -- render_MaterialOverride( orbMat )
-                    -- render_SetBlend( intensity )
-                    -- orb:DrawModel()
-                    -- render_MaterialOverride()
-                    -- render_SetBlend( blend )
+                    if intensity > 0.88 then
+                        local o_r, o_g, o_b = render_GetColorModulation()
+                        blend = render.GetBlend()
+
+                        render_MaterialOverride( colorMat )
+                        render_SetColorModulation( 0, 0, 0 )
+                        render_SetBlend( intensity )
+                        orb:DrawModel()
+                        render_MaterialOverride()
+                        render_SetBlend( blend )
+                        render_SetColorModulation( o_r, o_g, o_b )
+                    end
 
                     drawOrbOverlay( orb, intensity )
                 else

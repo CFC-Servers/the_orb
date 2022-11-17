@@ -29,43 +29,8 @@ local function setWeapon( ply, orb )
 
     local weaponClass = weapon:GetClass()
     if weaponClass == "none" then return end
-
-    local newWeapon = ents.Create( weaponClass )
-    local pos = ply:EyePos()
-    local ang = ply:EyeAngles()
-    local forward = ang:Forward()
-    local offset = forward * 175
-    newWeapon:SetPos( pos + offset + Vector( 0, 0, 40 ) )
-    newWeapon:SetAngles( ang )
-    newWeapon:SetCollisionGroup( COLLISION_GROUP_DEBRIS )
-
-    function newWeapon:Think()
-        local orbPos = orb:GetPos()
-        local weaponPos = self:GetPos()
-        local dir = ( orbPos - weaponPos ):GetNormalized()
-        local speed = 1000
-        local vel = dir * speed
-
-        local phys = self:GetPhysicsObject()
-        if IsValid( phys ) then
-            phys:SetVelocity( vel )
-        end
-
-        timer.Simple( 0.1, function()
-            if IsValid( self ) then
-                self:Think()
-            end
-        end )
-    end
-
-
     ply:Give( "none" )
     ply:SelectWeapon( "none" )
-    ply:StripWeapon( weaponClass )
-
-    newWeapon:Spawn()
-    newWeapon:SetCollisionGroup( COLLISION_GROUP_DEBRIS )
-    newWeapon:Think()
 end
 
 -- TODO:

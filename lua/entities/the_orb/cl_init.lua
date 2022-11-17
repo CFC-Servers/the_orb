@@ -1,6 +1,7 @@
 local IsValid = IsValid
 local CurTime = CurTime
 local DynamicLight = DynamicLight
+local EffectData = EffectData
 
 local math_Rand = math.Rand
 local math_random = math.random
@@ -13,7 +14,7 @@ include( "shared.lua" )
 
 ENT.EmitOnZap = "ambient/machines/thumper_hit.wav"
 ENT.LightOffset = Vector( 0, 0, 45 )
-ENT.ExplosionScale = 10 * 50
+ENT.ExplosionScale = 10 * 120
 
 -- This table is only used to keep thunder sounds
 -- in memory so they don't get garbage collected
@@ -64,9 +65,9 @@ function ENT:MakeHitExplosion( pos )
     explosion:SetOrigin( pos )
     explosion:SetNormal( normal )
     explosion:SetScale( self.ExplosionScale )
-    explosion:SetRadius( 0 )
+    explosion:SetRadius( self.ExplosionScale )
 
-    util_Effect( "ACF_Explosion", explosion )
+    util_Effect( "ACF_Heat_Explosion", explosion )
 end
 
 function ENT:Zap( target )
