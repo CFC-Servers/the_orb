@@ -180,11 +180,3 @@ end )
 hook.Add( "CanPlayerSuicide", "TheOrb_PlayerLocked", function( ply )
     if ply.OrbLocked then return false end
 end )
-
-hook.Add( "PlayerCanHearPlayersVoice", "TheOrb_PlayerLocked", function( _, talker )
-    if talker.OrbLocked then return false end
-end )
-
-hook.Add( "PlayerCanSeePlayersChat", "TheOrb_PlayerLocked", function( _, talker )
-    if talker.OrbLocked then return false end
-end )
