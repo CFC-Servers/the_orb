@@ -202,7 +202,7 @@ function ENT:Zap( target )
         end
 
         local chance = math.random( 0, 100 )
-        if chance >= 75 then
+        if chance >= 75 and ACF_HEKill then
             ACF_HEKill( target, normal, 25000, targetPos + blastOffset )
         else
             target:Remove()
