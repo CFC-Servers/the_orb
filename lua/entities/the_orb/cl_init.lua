@@ -67,7 +67,12 @@ function ENT:MakeHitExplosion( pos )
     explosion:SetScale( self.ExplosionScale )
     explosion:SetRadius( self.ExplosionScale )
 
-    util_Effect( "ACF_Heat_Explosion", explosion )
+    if ACF then
+        util_Effect( "ACF_Heat_Explosion", explosion )
+    else
+        util_Effect( "Explosion", explosion )
+        util_Effect( "HelicopterMegaBomb", explosion )
+    end
 end
 
 function ENT:Zap( target )
