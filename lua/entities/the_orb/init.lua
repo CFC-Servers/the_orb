@@ -51,8 +51,14 @@ function ENT:SpawnFunction( ply, tr, className )
     local ent = ents.Create( className )
     ent:SetPos( spawnPos )
     ent:SetMaterial( self.Material )
-    ent:SetOwner( ply )
     ent:SetPlayer( ply )
+
+    if CPPI then
+        ent:CPPISetOwner( ply )
+    else
+        ent:SetOwner( ply )
+    end
+
     ent:Spawn()
 
     return ent
