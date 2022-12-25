@@ -256,6 +256,59 @@ local function screenEffects()
     end
 end
 
+local function drawGazingPlayer( ply )
+    local intensity = gazeIntensity( ply )
+    local blend = render_GetBlend()
+
+    render_SetBlend( intensity )
+    render_MaterialOverride( linesMat )
+    ply:DrawModel()
+    render_MaterialOverride()
+    render_SetBlend( blend )
+
+    local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
+    if IsValid( orb ) then
+        if ply == LocalPlayer() then
+            if intensity > 0.88 then
+                local o_r, o_g, o_b = render_GetColorModulation()
+                blend = render.GetBlend()
+
+                render_MaterialOverride( colorMat )
+                render_SetColorModulation( 0, 0, 0 )
+                render_SetBlend( intensity )
+                orb:DrawModel()
+                render_MaterialOverride()
+                render_SetBlend( blend )
+                render_SetColorModulation( o_r, o_g, o_b )
+            end
+
+            drawOrbOverlay( orb, intensity )
+        else
+            local segments = generateSegments( orb, ply, 0.6, 0.35 )
+            local segmentCount = #segments
+
+            render_StartBeam( segmentCount )
+            render_SetMaterial( beamMat )
+
+            for i = 1, segmentCount do
+                local segment = rawget( segments, i )
+                local distanceFromCenter
+                if i > segmentCount / 2 then
+                    distanceFromCenter = i - segmentCount / 2
+                else
+                    distanceFromCenter = segmentCount / 2 - i
+                end
+
+                local beamWidth = 2 + ( 30 - distanceFromCenter )
+
+                render_AddBeam( segment, beamWidth, i / segmentCount )
+            end
+
+            render_EndBeam()
+        end
+    end
+end
+
 hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
     if skybox3d then return end
@@ -268,56 +321,7 @@ hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, sky
         local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing" )
 
         if plyIsGazing then
-            local intensity = gazeIntensity( ply )
-            local blend = render_GetBlend()
-
-            render_SetBlend( intensity )
-            render_MaterialOverride( linesMat )
-            ply:DrawModel()
-            render_MaterialOverride()
-            render_SetBlend( blend )
-
-            local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
-            if IsValid( orb ) then
-                if ply == LocalPlayer() then
-                    if intensity > 0.88 then
-                        local o_r, o_g, o_b = render_GetColorModulation()
-                        blend = render.GetBlend()
-
-                        render_MaterialOverride( colorMat )
-                        render_SetColorModulation( 0, 0, 0 )
-                        render_SetBlend( intensity )
-                        orb:DrawModel()
-                        render_MaterialOverride()
-                        render_SetBlend( blend )
-                        render_SetColorModulation( o_r, o_g, o_b )
-                    end
-
-                    drawOrbOverlay( orb, intensity )
-                else
-                    local segments = generateSegments( orb, ply, 0.6, 0.35 )
-                    local segmentCount = #segments
-
-                    render_StartBeam( segmentCount )
-                    render_SetMaterial( beamMat )
-
-                    for j = 1, segmentCount do
-                        local segment = rawget( segments, j )
-                        local distanceFromCenter
-                        if j > segmentCount / 2 then
-                            distanceFromCenter = j - segmentCount / 2
-                        else
-                            distanceFromCenter = segmentCount / 2 - j
-                        end
-
-                        local beamWidth = 2 + ( 30 - distanceFromCenter )
-
-                        render_AddBeam( segment, beamWidth, j / segmentCount )
-                    end
-
-                    render_EndBeam()
-                end
-            end
+            drawGazingPlayer( ply )
         end
     end
     cam.End3D()
