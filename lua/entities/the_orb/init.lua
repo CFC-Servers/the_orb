@@ -69,9 +69,9 @@ function ENT:CanZap( e )
     if e == self then return false end
     if e.ZapImmune then return false end
 
-    local owner = self:GetOwner()
-    if e == owner then return false end
-    if e.CPPIGetOwner and e:CPPIGetOwner() == owner then
+    local orbOwner = CPPI and self:CPPIGetOwner() or self:GetOwner()
+    if e == orbOwner then return false end
+    if e.CPPIGetOwner and e:CPPIGetOwner() == orbOwner then
         return false
     end
 
@@ -153,7 +153,7 @@ end
 
 function ENT:HandlePlayerZap( ply )
     local plyPos = ply:GetPos()
-    local owner = self:GetOwner()
+    local owner = CPPI and self:CPPIGetOwner() or self:GetOwner()
 
     local dmg = DamageInfo()
     dmg:SetAttacker( owner )
