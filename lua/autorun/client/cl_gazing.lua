@@ -14,8 +14,7 @@ local math_rad = math.rad
 local math_sin = math.sin
 local math_cos = math.cos
 local math_random = math.random
-
-local draw_NoTexture = draw.NoTexture
+local math_randomseed = math.randomseed
 
 local render_Clear = render.Clear
 local render_AddBeam = render.AddBeam
@@ -76,6 +75,8 @@ local bloomR = 0.25
 local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 local lineworldModelMat = Material( "models/shadertest/shader4" )
+local refractMat = Material( "the_orb/refract" )
+local centerMat = Material( "effects/tp_eyefx/tpeye2" )
 
 -- local fuzzyMat = Material( "effects/flashlight/caustics" )
 
@@ -155,6 +156,102 @@ local function makeCircle( radius, seg, instability )
     return cir
 end
 
+local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
+    local cir = existingPoly or {}
+    local minRadMod = 0.8
+    local maxRadMod = 1.2
+    local radModifiers = {}
+
+    shapeSeed = shapeSeed or math_random(1, 10000)
+
+    if not existingPoly then
+        table_insert(cir, {x = 0, y = 0, u = 0.5, v = 0.5})
+    end
+
+    -- Generate random radius modifiers for each segment
+    for i = 0, seg do
+        math_randomseed(shapeSeed + i)
+        radModifiers[i] = minRadMod + math_random() * (maxRadMod - minRadMod)
+    end
+
+    local a, sin_a, cos_a, segRadius
+    for i = 0, seg do
+        a = math_rad((i / seg) * -360)
+        sin_a = math_sin(a)
+        cos_a = math_cos(a)
+
+        -- Smooth the radius by averaging with neighboring segments
+        local prevIndex = (i - 1) % (seg + 1)
+        local nextIndex = (i + 1) % (seg + 1)
+        segRadius = radius * (radModifiers[i] + radModifiers[prevIndex] + radModifiers[nextIndex]) / 3
+
+        -- Apply sine and cosine waves to create a random rift-like shape
+        math_randomseed(shapeSeed)
+        local frequency1 = math_random(4, 8)
+        local frequency2 = math_random(4, 8)
+        local amplitude1 = 0.1 + 0.2 * math_random()
+        local amplitude2 = 0.1 + 0.2 * math_random()
+
+        segRadius = segRadius * (1 + amplitude1 * math_sin(frequency1 * a + timeFactor)) * (1 + amplitude2 * math_cos(frequency2 * a + timeFactor))
+
+        if existingPoly then
+            cir[i + 2] = {
+                x = sin_a * segRadius,
+                y = cos_a * segRadius,
+                u = sin_a / 2 + 0.5,
+                v = cos_a / 2 + 0.5
+            }
+        else
+            table_insert(cir, {
+                x = sin_a * segRadius,
+                y = cos_a * segRadius,
+                u = sin_a / 2 + 0.5,
+                v = cos_a / 2 + 0.5
+            })
+        end
+    end
+
+    if not existingPoly then
+        a = math_rad(0)
+        table_insert(cir, {
+            x = math_sin(a) * radius,
+            y = math_cos(a) * radius,
+            u = math_sin(a) / 2 + 0.5,
+            v = math_cos(a) / 2 + 0.5
+        })
+    end
+
+    return cir, shapeSeed
+end
+
+local function scaleRift(existingRift, scaleFactor)
+    local scaledRiftPoly = {}
+
+    for i, vertex in ipairs( existingRift ) do
+        rawset( scaledRiftPoly, i, {
+            x = vertex.x * scaleFactor,
+            y = vertex.y * scaleFactor,
+            u = vertex.u,
+            v = vertex.v
+        } )
+    end
+
+    return scaledRiftPoly
+end
+
+local baseRift
+local riftSeed
+local lastRiftUpdate = 0
+local function getRift( intensity )
+  if not baseRift or CurTime() > lastRiftUpdate + engine.TickInterval() then
+      baseRift, riftSeed = makeRift( 1024, 512, baseRift, riftSeed, CurTime() )
+      lastRiftUpdate = CurTime()
+  end
+
+  return scaleRift( baseRift, intensity )
+end
+
+
 local isDrawingLineWorld = false
 local renderViewParams = { drawviewmodel = false, drawhud = false, }
 
@@ -179,21 +276,14 @@ local function drawOrbOverlay( orb, intensity )
 
     local camPos = orbPos + ( trace.Normal * ( orb:BoundingRadius() - 3 ) )
 
-    local function getCircle( scaleMod, instability, segments )
-        scaleMod = scaleMod or 1
-        segments = segments or 12
-        return makeCircle( ( scaleMod * 22 ) * intensity, segments, instability )
-    end
-
     -- Create the line world
     render_PushRenderTarget( lineWorldRT )
         render_Clear( 0, 0, 0, 255, true, true )
 
         -- Setup material overrides
-        render_SetLightingMode( 1 )
         render_WorldMaterialOverride( linesMat )
         render_BrushMaterialOverride( linesMat )
-        render_MaterialOverride( lineworldModelMat )
+        -- render_MaterialOverride( lineworldModelMat )
         render_ModelMaterialOverride( lineworldModelMat )
 
         -- Draw the line world
@@ -202,27 +292,26 @@ local function drawOrbOverlay( orb, intensity )
         isDrawingLineWorld = false
 
         -- Reset overrides
-        render_SetLightingMode( 0 )
-        render_MaterialOverride( nil )
+        -- render_MaterialOverride( nil )
         render_WorldMaterialOverride( nil )
-        render_BrushMaterialOverride( nil )
-        render_ModelMaterialOverride( nil )
+        render_BrushMaterialOverride(nil )
+        render_ModelMaterialOverride(nil)
 
-        local bluramount = 0.85 * ( 1 - intensity )
+        local bluramount = 0.4 * ( 1 - intensity )
         local passes = 8 * ( 1 - intensity )
         render.BlurRenderTarget( lineWorldRT, bluramount, bluramount, passes )
     render_PopRenderTarget()
 
-    -- Draw outer container circle
-    local circle
-    cam_Start3D2D( camPos, camAngle, 1 )
-        circle = getCircle( 43, 0.035, 1024 )
-        surface_SetDrawColor( 0, 0, 0, 255 )
-        render_SetColorMaterial()
-        surface_DrawPoly( circle )
-    cam_End3D2D()
-
     resetStencils()
+
+    -- Prepare outer container poly
+    local riftPoly = getRift( intensity )
+
+    cam_Start3D2D( camPos, camAngle, 1 )
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 1.006 ) )
+    cam_End3D2D()
 
     -- Enable stencil
     render_SetStencilEnable( true )
@@ -236,10 +325,9 @@ local function drawOrbOverlay( orb, intensity )
 
     -- Draw the growing circle
     cam_Start3D2D( camPos, camAngle, 1 )
-        circle = getCircle( 47, 0.25, 512 )
         surface_SetDrawColor( 255, 255, 255, 255 )
-        draw_NoTexture()
-        surface_DrawPoly( circle )
+        draw.NoTexture()
+        surface_DrawPoly( riftPoly )
     cam_End3D2D()
 
     -- Set up stencil to punch through real world
@@ -251,6 +339,13 @@ local function drawOrbOverlay( orb, intensity )
 
     -- Let everything render normally again
     render_SetStencilEnable( false )
+
+    -- Draw Center color shape
+    cam_Start3D2D( camPos, camAngle, 1 )
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 0.085 ) )
+    cam_End3D2D()
 end
 
 local function updateEffectTable( intensity )
@@ -351,10 +446,10 @@ local function screenEffects()
         return
     end
 
-    _G.DrawColorModify( currentTable )
+    -- _G.DrawColorModify( currentTable )
     local intensity = gazeIntensity()
-    local sobel = 1 - intensity
-    _G.DrawSobel( sobel )
+    -- local sobel = 1 - intensity
+    -- _G.DrawSobel( sobel )
 
     if intensity > 0.88 then
         _G.DrawSharpen( 3, 2 )
@@ -515,6 +610,10 @@ local function gazeTick()
         screamSound:Stop()
         passiveNoise:Stop()
         LocalPlayer():SetDSP( 0, true )
+
+        baseRift = nil
+        riftSeed = nil
+        lastRiftUpdate = 0
 
         if ourOrb then
             ourOrb = nil

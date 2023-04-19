@@ -6,6 +6,7 @@ resource.AddSingleFile( "sound/the_orb/chant.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-1.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-2.mp3" )
 resource.AddSingleFile( "sound/the_orb/thunder-3.mp3" )
+resource.AddSingleFile( "materials/the_orb/refract.vmt" )
 
 OrbManager = {
     Orbs = {}

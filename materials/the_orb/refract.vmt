@@ -1,0 +1,10 @@
+"g_refract"
+{
+    "$refractamount"	"0.45"
+    "$bluramount"		"0"
+    "$nocull"			1
+    "$fbtexture" "_rt_FullFrameFB"
+    // "$normalmap" "effects/fisheyelens_normal"
+    // "$normalmap" "refract/refractglass003_normal"
+    "$normalmap" "shadertest/noise_normal"
+}
