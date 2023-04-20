@@ -92,7 +92,7 @@ local function drawZaps()
                 render_DrawBeam( lastPos, segment, outlineWidth, 0, 0, zapColOutline )
 
                 -- Draw original bolt
-                render_SetMaterial(zapMat)
+                render_SetMaterial( zapMat )
                 render_DrawBeam( lastPos, segment, width, 0, 0, zapCol )
             end
         end
