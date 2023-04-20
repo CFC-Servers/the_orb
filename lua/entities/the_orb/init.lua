@@ -10,7 +10,7 @@ local math_random = math.random
 local blastOffset = Vector( 0, 0, 25 )
 
 ENT.AutomaticFrameAdvance = true
-ENT.MaxZapsPerCheck = 12
+ENT.MaxZapsPerCheck = 24
 ENT.SpawnOffset = Vector( 0, 0, 50 )
 ENT.ExtraRagdollVelocity = Vector( 0, 0, 2250 )
 ENT.RagdollOptions = {
@@ -46,7 +46,7 @@ ENT.ZapClassBlacklist = {
 function ENT:SpawnFunction( ply, tr, className )
     if not tr.Hit then return end
 
-    local spawnPos = tr.HitPos + Vector( 0, 0, 250 )
+    local spawnPos = tr.HitPos + Vector( 0, 0, 175 )
 
     local ent = ents.Create( className )
     ent:SetPos( spawnPos )
@@ -106,7 +106,7 @@ function ENT:TossRagdoll( ragdoll, vel )
         local bonePhys = ragdoll:GetPhysicsObjectNum( i )
 
         if IsValid( bonePhys ) then
-            bonePhys:SetVelocity( vel + ( VectorRand() * 10 ) )
+            bonePhys:SetVelocity( vel + ( VectorRand() * 25 ) )
         end
     end
 end
@@ -120,7 +120,7 @@ function ENT:MakePlayerRagdoll( ply )
     local plyPos = ply:GetPos()
 
     local diff = self:GetPos() - plyPos
-    local vel = -( diff * 12 ) + self.ExtraRagdollVelocity
+    local vel = -( diff * 43 ) + self.ExtraRagdollVelocity
 
     local ragdoll = ents.Create( "prop_ragdoll" )
     ragdoll.ZapImmune = true

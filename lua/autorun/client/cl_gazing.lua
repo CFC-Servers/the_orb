@@ -1,5 +1,3 @@
-local Lerp = Lerp
-
 local rawget = rawget
 local rawset = rawset
 local IsValid = IsValid
@@ -27,7 +25,6 @@ local render_SetMaterial = render.SetMaterial
 local render_ClearStencil = render.ClearStencil
 local render_PopRenderTarget = render.PopRenderTarget
 local render_SetLightingMode = render.SetLightingMode
-local render_SetColorMaterial = render.SetColorMaterial
 local render_PushRenderTarget = render.PushRenderTarget
 local render_MaterialOverride = render.MaterialOverride
 local render_SetStencilEnable = render.SetStencilEnable
@@ -53,12 +50,8 @@ local MATERIAL_RT_DEPTH_SHARED = MATERIAL_RT_DEPTH_SHARED
 local surface_SetDrawColor = surface.SetDrawColor
 local surface_DrawPoly = surface.DrawPoly
 
-local cam_End3D = cam.End3D
-local cam_Start3D = cam.Start3D
 local cam_End3D2D = cam.End3D2D
 local cam_Start3D2D = cam.Start3D2D
-
-local vec_zero = Vector( 0, 0, 0 )
 
 local peakBrightness = -0.2
 local peakContrast = 1.03
@@ -75,10 +68,6 @@ local bloomR = 0.25
 local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
 local lineworldModelMat = Material( "models/shadertest/shader4" )
-local refractMat = Material( "the_orb/refract" )
-local centerMat = Material( "effects/tp_eyefx/tpeye2" )
-
--- local fuzzyMat = Material( "effects/flashlight/caustics" )
 
 -- TODO: Make this var shared somehow
 local maxGazeDuration = 21.15
@@ -113,49 +102,6 @@ local function resetStencils()
     render_ClearStencil()
 end
 
---- @param radius number The radius of the circle
---- @param seg number The number of segments to use for the circle
---- @param instability number The amount of randomness to add to the circle ( 0-1, 0 = perfect circle )
-local function makeCircle( radius, seg, instability )
-    local cir = {}
-    instability = instability or 0
-
-    table_insert( cir, { x = 0, y = 0, u = 0.5, v = 0.5 } )
-
-    local minRadMod = 0.1
-    local maxRadMod = 0.5
-
-    local a, sin_a, cos_a, segRadius, radModifier
-    for i = 0, seg do
-        a = math_rad( ( i / seg ) * -360 )
-        sin_a = math_sin( a )
-        cos_a = math_cos( a )
-
-        segRadius = radius
-        if instability > 0 then
-            radModifier = math_random() * ( maxRadMod - minRadMod )
-            segRadius = Lerp( instability, radius, radius * radModifier )
-        end
-
-        table_insert( cir, {
-            x = sin_a * segRadius,
-            y = cos_a * segRadius,
-            u = sin_a / 2 + 0.5,
-            v = cos_a / 2 + 0.5
-        } )
-    end
-
-    a = math_rad( 0 )
-    table_insert( cir, {
-        x = math_sin( a ) * radius,
-        y = math_cos( a ) * radius,
-        u = math_sin( a ) / 2 + 0.5,
-        v = math_cos( a ) / 2 + 0.5
-    } )
-
-    return cir
-end
-
 local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
     local cir = existingPoly or {}
     local minRadMod = 0.8
@@ -181,14 +127,25 @@ local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
         cos_a = math_cos(a)
 
         -- Smooth the radius by averaging with neighboring segments
-        local prevIndex = (i - 1) % (seg + 1)
-        local nextIndex = (i + 1) % (seg + 1)
-        segRadius = radius * (radModifiers[i] + radModifiers[prevIndex] + radModifiers[nextIndex]) / 3
+        local averageRadius = radModifiers[i]
+        local neighborCount = 1
+
+        local prevIndex, nextIndex
+        for n = 1, 2 do
+            prevIndex = (i - n) % (seg + 1)
+            nextIndex = (i + n) % (seg + 1)
+
+            averageRadius = averageRadius + radModifiers[prevIndex] + radModifiers[nextIndex]
+            neighborCount = neighborCount + 2
+        end
+
+        averageRadius = averageRadius / neighborCount
+        segRadius = radius * Lerp( 0.6, radModifiers[i], averageRadius)
 
         -- Apply sine and cosine waves to create a random rift-like shape
         math_randomseed(shapeSeed)
-        local frequency1 = math_random(4, 8)
-        local frequency2 = math_random(4, 8)
+        local frequency1 = math_random(6, 8)
+        local frequency2 = math_random(6, 8)
         local amplitude1 = 0.1 + 0.2 * math_random()
         local amplitude2 = 0.1 + 0.2 * math_random()
 
@@ -244,7 +201,7 @@ local riftSeed
 local lastRiftUpdate = 0
 local function getRift( intensity )
   if not baseRift or CurTime() > lastRiftUpdate + engine.TickInterval() then
-      baseRift, riftSeed = makeRift( 1024, 512, baseRift, riftSeed, CurTime() )
+      baseRift, riftSeed = makeRift( 1500, 200, baseRift, riftSeed, CurTime() / 2.5 )
       lastRiftUpdate = CurTime()
   end
 
@@ -281,9 +238,11 @@ local function drawOrbOverlay( orb, intensity )
         render_Clear( 0, 0, 0, 255, true, true )
 
         -- Setup material overrides
+        render.SetShadowsDisabled( true )
+        render.SuppressEngineLighting( true )
         render_WorldMaterialOverride( linesMat )
         render_BrushMaterialOverride( linesMat )
-        -- render_MaterialOverride( lineworldModelMat )
+        render_MaterialOverride( lineworldModelMat )
         render_ModelMaterialOverride( lineworldModelMat )
 
         -- Draw the line world
@@ -292,14 +251,12 @@ local function drawOrbOverlay( orb, intensity )
         isDrawingLineWorld = false
 
         -- Reset overrides
-        -- render_MaterialOverride( nil )
+        render.SetShadowsDisabled( false )
+        render.SuppressEngineLighting( false )
+        render_MaterialOverride( nil )
         render_WorldMaterialOverride( nil )
-        render_BrushMaterialOverride(nil )
-        render_ModelMaterialOverride(nil)
-
-        local bluramount = 0.4 * ( 1 - intensity )
-        local passes = 8 * ( 1 - intensity )
-        render.BlurRenderTarget( lineWorldRT, bluramount, bluramount, passes )
+        render_BrushMaterialOverride( nil )
+        render_ModelMaterialOverride( nil )
     render_PopRenderTarget()
 
     resetStencils()
@@ -310,7 +267,7 @@ local function drawOrbOverlay( orb, intensity )
     cam_Start3D2D( camPos, camAngle, 1 )
         surface_SetDrawColor( 255, 255, 255, 255 )
         render.SetColorMaterialIgnoreZ()
-        surface_DrawPoly( scaleRift( riftPoly, 1.006 ) )
+        surface_DrawPoly( scaleRift( riftPoly, 1.0075 ) )
     cam_End3D2D()
 
     -- Enable stencil
@@ -342,9 +299,13 @@ local function drawOrbOverlay( orb, intensity )
 
     -- Draw Center color shape
     cam_Start3D2D( camPos, camAngle, 1 )
+        surface_SetDrawColor( 0, 0, 0, 255 )
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 0.1 ) )
+
         surface_SetDrawColor( 255, 255, 255, 255 )
         render.SetColorMaterialIgnoreZ()
-        surface_DrawPoly( scaleRift( riftPoly, 0.085 ) )
+        surface_DrawPoly( scaleRift( riftPoly, 0.09 ) )
     cam_End3D2D()
 end
 
@@ -498,16 +459,17 @@ local function drawGazingPlayer( ply )
     end
 end
 
+
 hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
     -- Draw black over the skybox if we're drawing LineWorld
     if not isDrawingLineWorld then return end
     render_OverrideDepthEnable( true, false )
     render_SetLightingMode( 2 )
 
-    cam_Start3D( vec_zero, EyeAngles() )
-    render_SetColorMaterial()
-    render_Clear( 0, 0, 0, 255, true, false )
-    cam_End3D()
+    -- Start 3D cam centered at the origin
+    cam.Start3D(Vector(0, 0, 0), EyeAngles())
+        render_Clear( 60, 0, 0, 255, true, false )
+    cam.End3D()
 
     render_OverrideDepthEnable( false, false )
     render_SetLightingMode( 0 )
@@ -568,8 +530,8 @@ local function gazeTick()
         screamSound:Stop()
 
         passiveNoise = passiveNoise or CreateSound(
-        LocalPlayer(),
-        "synth/brown_noise.wav"
+            LocalPlayer(),
+            "synth/brown_noise.wav"
         )
         passiveNoise:PlayEx( 0.1, 100 )
         passiveNoise:SetSoundLevel( 120 )
@@ -622,5 +584,3 @@ local function gazeTick()
 end
 
 hook.Add( "Tick", "TheOrb_Gazing", gazeTick )
-
-print( "The Orb loaded gazing module!" )

@@ -141,7 +141,6 @@ local function handlePlayerView( ply )
     end
 end
 
-
 hook.Add( "Think", "TheOrb_Think", function()
     local plys = player.GetAll()
     local plyCount = #plys
