@@ -58,7 +58,7 @@ function generateSegments( orb, target, segmentMod, ziggyMod )
     return segments
 end
 
-local zapColOutline = Color(0, 0, 0, 255)
+local zapColOutline = Color( 0, 0, 0, 255 )
 
 local function drawZaps()
     for z = #zaps, 1, -1 do
@@ -78,30 +78,28 @@ local function drawZaps()
                 local t = i / segmentCount
 
                 local randomWidthFactor = math_random() * 0.5 + 0.75
-                local width = baseWidth * (1 - lifetime / zapLifetime) * randomWidthFactor
-                local outlineWidth = width / 8 -- Adjust this value to control the outline thickness
+                local width = baseWidth * ( 1 - lifetime / zapLifetime ) * randomWidthFactor
+                local outlineWidth = width / 6.5 -- Adjust this value to control the outline thickness
 
                 local freq = 2 -- frequency of the sine wave
                 local amp = 0.5 -- amplitude of the sine wave
-                local sinOffset = math_sin(t * math.pi * freq) * amp
+                local sinOffset = math_sin( t * math.pi * freq ) * amp
 
-                zapCol.a = zapCol.a * (1 - sinOffset)
+                zapCol.a = zapCol.a * ( 1 - sinOffset )
 
                 -- Draw outline
                 render.SetColorMaterial()
-                render_DrawBeam(lastPos, segment, outlineWidth, 0, 0, zapColOutline)
+                render_DrawBeam( lastPos, segment, outlineWidth, 0, 0, zapColOutline )
 
                 -- Draw original bolt
                 render_SetMaterial(zapMat)
-                render_DrawBeam(lastPos, segment, width, 0, 0, zapCol)
+                render_DrawBeam( lastPos, segment, width, 0, 0, zapCol )
             end
         end
     end
 end
 
-hook.Add("PostDrawTranslucentRenderables", "TheOrb_DrawZaps", drawZaps)
-
-
+hook.Add( "PostDrawTranslucentRenderables", "TheOrb_DrawZaps", drawZaps )
 
 net.Receive( "TheOrb_Zap", function()
     local orb = net.ReadEntity()

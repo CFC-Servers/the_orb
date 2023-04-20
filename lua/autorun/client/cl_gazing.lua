@@ -152,7 +152,7 @@ local function makeRift( radius, seg, existingPoly, shapeSeed, timeFactor )
         local amplitude1 = 0.1 + 0.2 * math_random()
         local amplitude2 = 0.1 + 0.2 * math_random()
 
-        segRadius = segRadius * ( 1 + amplitude1 * math_sin( frequency1 * a + timeFactor ) ) * ( 1 + amplitude2 * math_cos(frequency2 * a + timeFactor ) )
+        segRadius = segRadius * ( 1 + amplitude1 * math_sin( frequency1 * a + timeFactor ) ) * ( 1 + amplitude2 * math_cos( frequency2 * a + timeFactor ) )
 
         if existingPoly then
             cir[i + 2] = {
@@ -167,7 +167,7 @@ local function makeRift( radius, seg, existingPoly, shapeSeed, timeFactor )
                 y = cos_a * segRadius,
                 u = sin_a / 2 + 0.5,
                 v = cos_a / 2 + 0.5
-            })
+            } )
         end
     end
 
@@ -476,7 +476,7 @@ hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
 
     render_OverrideDepthEnable( false, false )
     render_SetLightingMode( 0 )
-end)
+end )
 
 hook.Add( "PostDrawTranslucentRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
