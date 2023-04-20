@@ -53,6 +53,9 @@ local surface_DrawPoly = surface.DrawPoly
 local cam_End3D2D = cam.End3D2D
 local cam_Start3D2D = cam.Start3D2D
 
+local colorBlack = Color( 0, 0, 0 )
+local vecZero = Vector( 0, 0, 0 )
+
 local peakBrightness = -0.2
 local peakContrast = 1.03
 local peakVolume = 8
@@ -102,29 +105,29 @@ local function resetStencils()
     render_ClearStencil()
 end
 
-local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
+local function makeRift( radius, seg, existingPoly, shapeSeed, timeFactor )
     local cir = existingPoly or {}
     local minRadMod = 0.8
     local maxRadMod = 1.2
     local radModifiers = {}
 
-    shapeSeed = shapeSeed or math_random(1, 10000)
+    shapeSeed = shapeSeed or math_random( 1, 10000 )
 
     if not existingPoly then
-        table_insert(cir, {x = 0, y = 0, u = 0.5, v = 0.5})
+        table_insert( cir, { x = 0, y = 0, u = 0.5, v = 0.5 } )
     end
 
     -- Generate random radius modifiers for each segment
     for i = 0, seg do
-        math_randomseed(shapeSeed + i)
-        radModifiers[i] = minRadMod + math_random() * (maxRadMod - minRadMod)
+        math_randomseed( shapeSeed + i )
+        radModifiers[i] = minRadMod + math_random() * ( maxRadMod - minRadMod )
     end
 
     local a, sin_a, cos_a, segRadius
     for i = 0, seg do
-        a = math_rad((i / seg) * -360)
-        sin_a = math_sin(a)
-        cos_a = math_cos(a)
+        a = math_rad( ( i / seg ) * -360 )
+        sin_a = math_sin( a )
+        cos_a = math_cos( a )
 
         -- Smooth the radius by averaging with neighboring segments
         local averageRadius = radModifiers[i]
@@ -132,24 +135,24 @@ local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
 
         local prevIndex, nextIndex
         for n = 1, 2 do
-            prevIndex = (i - n) % (seg + 1)
-            nextIndex = (i + n) % (seg + 1)
+            prevIndex = ( i - n ) % ( seg + 1 )
+            nextIndex = ( i + n ) % ( seg + 1 )
 
             averageRadius = averageRadius + radModifiers[prevIndex] + radModifiers[nextIndex]
             neighborCount = neighborCount + 2
         end
 
         averageRadius = averageRadius / neighborCount
-        segRadius = radius * Lerp( 0.6, radModifiers[i], averageRadius)
+        segRadius = radius * Lerp( 0.6, radModifiers[i], averageRadius )
 
         -- Apply sine and cosine waves to create a random rift-like shape
-        math_randomseed(shapeSeed)
-        local frequency1 = math_random(6, 8)
-        local frequency2 = math_random(6, 8)
+        math_randomseed( shapeSeed )
+        local frequency1 = math_random( 6, 8 )
+        local frequency2 = math_random( 6, 8 )
         local amplitude1 = 0.1 + 0.2 * math_random()
         local amplitude2 = 0.1 + 0.2 * math_random()
 
-        segRadius = segRadius * (1 + amplitude1 * math_sin(frequency1 * a + timeFactor)) * (1 + amplitude2 * math_cos(frequency2 * a + timeFactor))
+        segRadius = segRadius * ( 1 + amplitude1 * math_sin( frequency1 * a + timeFactor ) ) * ( 1 + amplitude2 * math_cos(frequency2 * a + timeFactor ) )
 
         if existingPoly then
             cir[i + 2] = {
@@ -159,7 +162,7 @@ local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
                 v = cos_a / 2 + 0.5
             }
         else
-            table_insert(cir, {
+            table_insert( cir, {
                 x = sin_a * segRadius,
                 y = cos_a * segRadius,
                 u = sin_a / 2 + 0.5,
@@ -169,19 +172,19 @@ local function makeRift(radius, seg, existingPoly, shapeSeed, timeFactor)
     end
 
     if not existingPoly then
-        a = math_rad(0)
-        table_insert(cir, {
-            x = math_sin(a) * radius,
-            y = math_cos(a) * radius,
-            u = math_sin(a) / 2 + 0.5,
-            v = math_cos(a) / 2 + 0.5
-        })
+        a = math_rad( 0 )
+        table_insert( cir, {
+            x = math_sin( a ) * radius,
+            y = math_cos( a ) * radius,
+            u = math_sin( a ) / 2 + 0.5,
+            v = math_cos( a ) / 2 + 0.5
+        } )
     end
 
     return cir, shapeSeed
 end
 
-local function scaleRift(existingRift, scaleFactor)
+local function scaleRift( existingRift, scaleFactor )
     local scaledRiftPoly = {}
 
     for i, vertex in ipairs( existingRift ) do
@@ -467,7 +470,7 @@ hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
     render_SetLightingMode( 2 )
 
     -- Start 3D cam centered at the origin
-    cam.Start3D(Vector(0, 0, 0), EyeAngles())
+    cam.Start3D( vecZero, EyeAngles() )
         render_Clear( 60, 0, 0, 255, true, false )
     cam.End3D()
 
@@ -546,7 +549,7 @@ local function gazeTick()
         hook.Add( "CalcView", "TheOrb_Gazing", calcView )
         hook.Add( "RenderScreenspaceEffects", "TheOrb_Gazing", screenEffects )
         hook.Add( "PreDrawHalos", "TheOrb_Gazing", function()
-            halo.Add( { LocalPlayer():GetNW2Entity( "TheOrb_GazingAt" ) }, Color( 0, 0, 0 ), 2, 2, 8, false, true )
+            halo.Add( { LocalPlayer():GetNW2Entity( "TheOrb_GazingAt" ) }, colorBlack, 2, 2, 8, false, true )
         end )
         hook.Add( "HUDShouldDraw", "TheOrb_Gazing", function()
             return false
