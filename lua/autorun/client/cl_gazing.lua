@@ -1,7 +1,9 @@
-local util_ScreenShake = util.ScreenShake
-local IsValid = IsValid
 local rawget = rawget
 local rawset = rawset
+local IsValid = IsValid
+local EyeAngles = EyeAngles
+local LocalPlayer = LocalPlayer
+local util_ScreenShake = util.ScreenShake
 
 local table_insert = table.insert
 
@@ -9,32 +11,58 @@ local math_max = math.max
 local math_rad = math.rad
 local math_sin = math.sin
 local math_cos = math.cos
-local math_Rand = math.Rand
+local math_random = math.random
+local math_randomseed = math.randomseed
 
-local render_StartBeam = render.StartBeam
+local render_Clear = render.Clear
 local render_AddBeam = render.AddBeam
 local render_EndBeam = render.EndBeam
-local render_SetMaterial = render.SetMaterial
-local render_MaterialOverride = render.MaterialOverride
 local render_GetBlend = render.GetBlend
 local render_SetBlend = render.SetBlend
-local render_SetColorModulation = render.SetColorModulation
-local render_GetColorModulation = render.GetColorModulation
+local render_StartBeam = render.StartBeam
+local render_RenderView = render.RenderView
+local render_SetMaterial = render.SetMaterial
+local render_ClearStencil = render.ClearStencil
+local render_PopRenderTarget = render.PopRenderTarget
+local render_SetLightingMode = render.SetLightingMode
+local render_PushRenderTarget = render.PushRenderTarget
+local render_MaterialOverride = render.MaterialOverride
+local render_SetStencilEnable = render.SetStencilEnable
+local render_SetStencilTestMask = render.SetStencilTestMask
+local render_OverrideDepthEnable = render.OverrideDepthEnable
+local render_SetStencilWriteMask = render.SetStencilWriteMask
+local render_DrawTextureToScreen = render.DrawTextureToScreen
+local render_WorldMaterialOverride = render.WorldMaterialOverride
+local render_BrushMaterialOverride = render.BrushMaterialOverride
+local render_ModelMaterialOverride = render.ModelMaterialOverride
+local render_SetStencilFailOperation = render.SetStencilFailOperation
+local render_SetStencilPassOperation = render.SetStencilPassOperation
+local render_SetStencilReferenceValue = render.SetStencilReferenceValue
+local render_SetStencilZFailOperation = render.SetStencilZFailOperation
+local render_SetStencilCompareFunction = render.SetStencilCompareFunction
 
-local surface_SetMaterial = surface.SetMaterial
+local STENCIL_KEEP = STENCIL_KEEP
+local STENCIL_NEVER = STENCIL_NEVER
+local STENCIL_REPLACE = STENCIL_REPLACE
+local IMAGE_FORMAT_RGBA8888 = IMAGE_FORMAT_RGBA8888
+local MATERIAL_RT_DEPTH_SHARED = MATERIAL_RT_DEPTH_SHARED
+
 local surface_SetDrawColor = surface.SetDrawColor
 local surface_DrawPoly = surface.DrawPoly
 
-local cam_Start3D2D = cam.Start3D2D
 local cam_End3D2D = cam.End3D2D
+local cam_Start3D2D = cam.Start3D2D
 
-local peakBrightness = -0.65
-local peakContrast = 1.25
-local peakVolume = 7
+local colorBlack = Color( 0, 0, 0 )
+local vecZero = Vector( 0, 0, 0 )
+
+local peakBrightness = -0.2
+local peakContrast = 1.03
+local peakVolume = 8
 local peakLightShake = 4.5
 local peakHeavyShake = 4
 
-local bloomDarken = 1
+local bloomDarken = 0.6
 local bloomMultiply = 0
 local bloomColorMultiply = 1
 local bloomPasses = 1
@@ -42,12 +70,7 @@ local bloomR = 0.25
 
 local beamMat = Material( "effects/tp_eyefx/tpeye" )
 local linesMat = Material( "models/XQM/LightLinesRed_tool" )
-local sunMat = Material( "effects/lensflare/flare" )
---local centerMat = Material( "effects/tp_eyefx/tpeye2" )
-local centerMat = Material( "lights/hazzardred001a" )
-local centerMat2 = Material( "effects/tp_eyefx/tpeye" )
-local colorMat = Material( "models/debug/debugwhite" )
--- local fuzzyMat = Material( "effects/flashlight/caustics" )
+local lineworldModelMat = Material( "models/shadertest/shader4" )
 
 -- TODO: Make this var shared somehow
 local maxGazeDuration = 21.15
@@ -71,78 +94,221 @@ local screamSound
 local passiveNoise
 local ourOrb
 
-local function makeCircle( x, y, radius, seg, intensity )
-    intensity = intensity * 1.75
-    local cir = {}
+local function resetStencils()
+    render_SetStencilWriteMask( 0xFF )
+    render_SetStencilTestMask( 0xFF )
+    render_SetStencilReferenceValue( 0 )
+    render_SetStencilCompareFunction( STENCIL_ALWAYS )
+    render_SetStencilPassOperation( STENCIL_KEEP )
+    render_SetStencilFailOperation( STENCIL_KEEP )
+    render_SetStencilZFailOperation( STENCIL_KEEP )
+    render_ClearStencil()
+end
 
-    table_insert( cir, { x = x, y = y, u = 0.5, v = 0.5 } )
+local function makeRift( radius, seg, existingPoly, shapeSeed, timeFactor )
+    local cir = existingPoly or {}
+    local minRadMod = 0.8
+    local maxRadMod = 1.2
+    local radModifiers = {}
+
+    shapeSeed = shapeSeed or math_random( 1, 10000 )
+
+    if not existingPoly then
+        table_insert( cir, { x = 0, y = 0, u = 0.5, v = 0.5 } )
+    end
+
+    -- Generate random radius modifiers for each segment
     for i = 0, seg do
-        local a = math_rad( ( i / seg ) * -360 )
+        math_randomseed( shapeSeed + i )
+        radModifiers[i] = minRadMod + math_random() * ( maxRadMod - minRadMod )
+    end
+
+    local a, sin_a, cos_a, segRadius
+    for i = 0, seg do
+        a = math_rad( ( i / seg ) * -360 )
+        sin_a = math_sin( a )
+        cos_a = math_cos( a )
+
+        -- Smooth the radius by averaging with neighboring segments
+        local averageRadius = radModifiers[i]
+        local neighborCount = 1
+
+        local prevIndex, nextIndex
+        for n = 1, 2 do
+            prevIndex = ( i - n ) % ( seg + 1 )
+            nextIndex = ( i + n ) % ( seg + 1 )
+
+            averageRadius = averageRadius + radModifiers[prevIndex] + radModifiers[nextIndex]
+            neighborCount = neighborCount + 2
+        end
+
+        averageRadius = averageRadius / neighborCount
+        segRadius = radius * Lerp( 0.6, radModifiers[i], averageRadius )
+
+        -- Apply sine and cosine waves to create a random rift-like shape
+        math_randomseed( shapeSeed )
+        local frequency1 = math_random( 6, 8 )
+        local frequency2 = math_random( 6, 8 )
+        local amplitude1 = 0.1 + 0.2 * math_random()
+        local amplitude2 = 0.1 + 0.2 * math_random()
+
+        segRadius = segRadius * ( 1 + amplitude1 * math_sin( frequency1 * a + timeFactor ) ) * ( 1 + amplitude2 * math_cos( frequency2 * a + timeFactor ) )
+
+        if existingPoly then
+            cir[i + 2] = {
+                x = sin_a * segRadius,
+                y = cos_a * segRadius,
+                u = sin_a / 2 + 0.5,
+                v = cos_a / 2 + 0.5
+            }
+        else
+            table_insert( cir, {
+                x = sin_a * segRadius,
+                y = cos_a * segRadius,
+                u = sin_a / 2 + 0.5,
+                v = cos_a / 2 + 0.5
+            } )
+        end
+    end
+
+    if not existingPoly then
+        a = math_rad( 0 )
         table_insert( cir, {
-            x = ( x + math_Rand( -intensity, intensity ) ) + math_sin( a ) * radius,
-            y = ( y + math_Rand( -intensity, intensity ) ) + math_cos( a ) * radius,
+            x = math_sin( a ) * radius,
+            y = math_cos( a ) * radius,
             u = math_sin( a ) / 2 + 0.5,
             v = math_cos( a ) / 2 + 0.5
         } )
     end
 
-    local a = math_rad( 0 )
-    table_insert( cir, {
-        x = x + math_sin( a ) * radius,
-        y = y + math_cos( a ) * radius,
-        u = math_sin( a ) / 2 + 0.5,
-        v = math_cos( a ) / 2 + 0.5
-    } )
-
-    return cir
+    return cir, shapeSeed
 end
 
+local function scaleRift( existingRift, scaleFactor )
+    local scaledRiftPoly = {}
+
+    for i, vertex in ipairs( existingRift ) do
+        rawset( scaledRiftPoly, i, {
+            x = vertex.x * scaleFactor,
+            y = vertex.y * scaleFactor,
+            u = vertex.u,
+            v = vertex.v
+        } )
+    end
+
+    return scaledRiftPoly
+end
+
+local baseRift
+local riftSeed
+local lastRiftUpdate = 0
+local function getRift( intensity )
+  if not baseRift or CurTime() > lastRiftUpdate + engine.TickInterval() then
+      baseRift, riftSeed = makeRift( 1500, 200, baseRift, riftSeed, CurTime() / 2.5 )
+      lastRiftUpdate = CurTime()
+  end
+
+  return scaleRift( baseRift, intensity )
+end
+
+
+local isDrawingLineWorld = false
+local renderViewParams = { drawviewmodel = false, drawhud = false, }
+
+local lineWorldRT = GetRenderTargetEx(
+    "the_orb_lineworld", ScrW(), ScrH(),
+    RT_SIZE_OFFSCREEN,
+    MATERIAL_RT_DEPTH_SHARED,
+    0,
+    0,
+    IMAGE_FORMAT_RGBA8888
+)
+
 local function drawOrbOverlay( orb, intensity )
-    local displacement = orb:GetPos() - LocalPlayer():EyePos()
-    local right        = displacement:Angle():Right()
-    local surfacePos = orb:GetPos() - displacement:GetNormalized() * orb:BoundingRadius()
-    local surfaceAng = displacement:Cross( right ):Angle()
+    if isDrawingLineWorld then return end
 
-    local function getCircle( scaleMod )
-        scaleMod = scaleMod or 1
-        return makeCircle( 0, 0, ( scaleMod * 22 ) * intensity, ( 150 * intensity ) + 75, intensity )
-    end
+    local trace = LocalPlayer():GetEyeTrace()
+    local orbPos = orb:GetPos()
+    local camAngle = EyeAngles()
+    camAngle.roll = 0
+    camAngle:RotateAroundAxis( camAngle:Up(), -90 )
+    camAngle:RotateAroundAxis( camAngle:Forward(), 90 )
 
-    cam_Start3D2D( surfacePos, surfaceAng, 1 )
+    local camPos = orbPos + ( trace.Normal * ( orb:BoundingRadius() - 3 ) )
 
-    local circle
-    if intensity < 0.88 then
-        circle = getCircle( 8 )
-        surface_SetMaterial( sunMat )
-        surface_SetDrawColor( 135, 135, 135, 255 )
-        surface_DrawPoly( circle )
-        surface_DrawPoly( circle )
+    -- Create the line world
+    render_PushRenderTarget( lineWorldRT )
+        render_Clear( 0, 0, 0, 255, true, true )
 
-        surface_SetMaterial( centerMat2 )
-        for _ = 1, 4 do
-            circle = getCircle( math.Rand( 0.1, 0.6 ) )
-            surface_DrawPoly( circle )
-        end
+        -- Setup material overrides
+        render.SetShadowsDisabled( true )
+        render.SuppressEngineLighting( true )
+        render_WorldMaterialOverride( linesMat )
+        render_BrushMaterialOverride( linesMat )
+        render_MaterialOverride( lineworldModelMat )
+        render_ModelMaterialOverride( lineworldModelMat )
 
-        circle = getCircle( 0.1 * intensity )
+        -- Draw the line world
+        isDrawingLineWorld = true
+        render_RenderView( renderViewParams )
+        isDrawingLineWorld = false
+
+        -- Reset overrides
+        render.SetShadowsDisabled( false )
+        render.SuppressEngineLighting( false )
+        render_MaterialOverride( nil )
+        render_WorldMaterialOverride( nil )
+        render_BrushMaterialOverride( nil )
+        render_ModelMaterialOverride( nil )
+    render_PopRenderTarget()
+
+    resetStencils()
+
+    -- Prepare outer container poly
+    local riftPoly = getRift( intensity )
+
+    cam_Start3D2D( camPos, camAngle, 1 )
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 1.0075 ) )
+    cam_End3D2D()
+
+    -- Enable stencil
+    render_SetStencilEnable( true )
+    render_SetStencilWriteMask( 0xFF )
+    render_SetStencilTestMask( 0xFF )
+    render_SetStencilReferenceValue( 1 )
+    render_SetStencilCompareFunction( STENCIL_NEVER )
+    render_SetStencilFailOperation( STENCIL_REPLACE )
+    render_SetStencilZFailOperation( STENCIL_KEEP )
+    render_SetStencilPassOperation( STENCIL_KEEP )
+
+    -- Draw the growing circle
+    cam_Start3D2D( camPos, camAngle, 1 )
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        draw.NoTexture()
+        surface_DrawPoly( riftPoly )
+    cam_End3D2D()
+
+    -- Set up stencil to punch through real world
+    render_SetStencilCompareFunction( STENCIL_EQUAL )
+    render_SetStencilFailOperation( STENCIL_KEEP )
+
+    -- Draw the Lines world
+    render_DrawTextureToScreen( lineWorldRT )
+
+    -- Let everything render normally again
+    render_SetStencilEnable( false )
+
+    -- Draw Center color shape
+    cam_Start3D2D( camPos, camAngle, 1 )
         surface_SetDrawColor( 0, 0, 0, 255 )
-        surface_SetMaterial( colorMat )
-        surface_DrawPoly( circle )
-        surface_DrawPoly( circle )
-    else
-        surface_SetDrawColor( 255, 5, 5, 255 )
-        surface_SetMaterial( centerMat )
-        for _ = 1, 8 do
-            circle = getCircle( math.Rand( 0.3, 0.65 ) )
-            surface_DrawPoly( circle )
-        end
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 0.1 ) )
 
-        circle = getCircle( 0.2 )
-        surface_SetDrawColor( 0, 0, 0, 255 )
-        surface_SetMaterial( colorMat )
-        surface_DrawPoly( circle )
-    end
-
+        surface_SetDrawColor( 255, 255, 255, 255 )
+        render.SetColorMaterialIgnoreZ()
+        surface_DrawPoly( scaleRift( riftPoly, 0.09 ) )
     cam_End3D2D()
 end
 
@@ -155,10 +321,10 @@ local function updateEffectTable( intensity )
     local brightness = isLocked and ( peakBrightness * 0.25 ) or peakBrightness * intensity
     rawset( currentTable, "$pp_colour_brightness", brightness )
 
-    local color = isLocked and 1 or math.max( 0.45, 1 - intensity )
+    local color = isLocked and 1 or math.max( 0.75, 1 - intensity )
     rawset( currentTable, "$pp_colour_colour", color )
 
-    bloomDarken = isLocked and 0.1 or 1 - ( 0.75 * intensity )
+    bloomDarken = isLocked and 0.4 or 1 - ( 0.85 * intensity )
     bloomMultiply = isLocked and 2.75 or 2 * intensity
     bloomColorMultiply = 1.75 * intensity
     bloomPasses = isLocked and 3 or 2 * intensity
@@ -244,10 +410,10 @@ local function screenEffects()
         return
     end
 
-    _G.DrawColorModify( currentTable )
+    -- _G.DrawColorModify( currentTable )
     local intensity = gazeIntensity()
-    local sobel = 2 - intensity
-    _G.DrawSobel( sobel )
+    -- local sobel = 1 - intensity
+    -- _G.DrawSobel( sobel )
 
     if intensity > 0.88 then
         _G.DrawSharpen( 3, 2 )
@@ -269,19 +435,6 @@ local function drawGazingPlayer( ply )
     local orb = ply:GetNW2Entity( "TheOrb_GazingAt" )
     if IsValid( orb ) then
         if ply == LocalPlayer() then
-            if intensity > 0.88 then
-                local o_r, o_g, o_b = render_GetColorModulation()
-                blend = render.GetBlend()
-
-                render_MaterialOverride( colorMat )
-                render_SetColorModulation( 0, 0, 0 )
-                render_SetBlend( intensity )
-                orb:DrawModel()
-                render_MaterialOverride()
-                render_SetBlend( blend )
-                render_SetColorModulation( o_r, o_g, o_b )
-            end
-
             drawOrbOverlay( orb, intensity )
         else
             local segments = generateSegments( orb, ply, 0.6, 0.35 )
@@ -309,7 +462,23 @@ local function drawGazingPlayer( ply )
     end
 end
 
-hook.Add( "PostDrawOpaqueRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
+
+hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
+    -- Draw black over the skybox if we're drawing LineWorld
+    if not isDrawingLineWorld then return end
+    render_OverrideDepthEnable( true, false )
+    render_SetLightingMode( 2 )
+
+    -- Start 3D cam centered at the origin
+    cam.Start3D( vecZero, EyeAngles() )
+        render_Clear( 60, 0, 0, 255, true, false )
+    cam.End3D()
+
+    render_OverrideDepthEnable( false, false )
+    render_SetLightingMode( 0 )
+end )
+
+hook.Add( "PostDrawTranslucentRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
     if skybox then return end
     if skybox3d then return end
     local plys = player.GetAll()
@@ -375,38 +544,12 @@ local function gazeTick()
             screamSound:SetSoundLevel( 140 )
         end )
 
-        local fogFunc = function( mod )
-            do return end
-            mod = mod or 1
-            render.FogMode( MATERIAL_FOG_LINEAR )
-
-            local intensity = gazeIntensity()
-
-            local fogStart, fogEnd
-
-            if intensity <= 0.15 then
-                fogStart = 85000 - math.Remap( intensity, 0, 0.15, 0, 80000 )
-                fogEnd = 100000 - math.Remap( intensity, 0, 0.15, 0, 93000 )
-            else
-                fogStart = 5000 - math.Remap( intensity, 0.25, 1, 0, 5000 )
-                fogEnd = 7000 - math.Remap( intensity, 0.25, 1, 0, 6000 )
-            end
-
-            render.FogStart( fogStart * mod )
-            render.FogEnd( fogEnd * mod )
-            render.FogMaxDensity( math.Remap( intensity, 0, 1, 0.75, 0.9 ) )
-            render.FogColor( 35, 0, 0 )
-            return true
-        end
-
         LocalPlayer():SetDSP( 16 )
 
-        hook.Add( "SetupWorldFog", "TheOrb_Gazing", fogFunc )
-        hook.Add( "SetupSkyboxFog", "TheOrb_Gazing", fogFunc )
         hook.Add( "CalcView", "TheOrb_Gazing", calcView )
         hook.Add( "RenderScreenspaceEffects", "TheOrb_Gazing", screenEffects )
         hook.Add( "PreDrawHalos", "TheOrb_Gazing", function()
-            halo.Add( { LocalPlayer():GetNW2Entity( "TheOrb_GazingAt" ) }, Color( 0, 0, 0 ), 2, 2, 8, false, true )
+            halo.Add( { LocalPlayer():GetNW2Entity( "TheOrb_GazingAt" ) }, colorBlack, 2, 2, 8, false, true )
         end )
         hook.Add( "HUDShouldDraw", "TheOrb_Gazing", function()
             return false
@@ -432,6 +575,10 @@ local function gazeTick()
         screamSound:Stop()
         passiveNoise:Stop()
         LocalPlayer():SetDSP( 0, true )
+
+        baseRift = nil
+        riftSeed = nil
+        lastRiftUpdate = 0
 
         if ourOrb then
             ourOrb = nil
