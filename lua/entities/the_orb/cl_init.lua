@@ -43,7 +43,7 @@ function ENT:PlaySparkSound( pos )
 end
 
 function ENT:MakeFlash( pos )
-    local light = DynamicLight()
+    local light = DynamicLight( self:EntIndex() )
     if not light then return end
 
     light.Pos = pos + self.LightOffset
