@@ -2,10 +2,7 @@ local IsValid = IsValid
 local rawget = rawget
 
 util.AddNetworkString( "TheOrb_Zap" )
-resource.AddSingleFile( "sound/the_orb/chant.mp3" )
-resource.AddSingleFile( "sound/the_orb/thunder-1.mp3" )
-resource.AddSingleFile( "sound/the_orb/thunder-2.mp3" )
-resource.AddSingleFile( "sound/the_orb/thunder-3.mp3" )
+resource.AddWorkshop( "3114953830" )
 
 OrbManager = {
     Orbs = {}
