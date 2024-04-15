@@ -165,7 +165,7 @@ hook.Add( "PlayerSpawn", "TheOrb_PlayerReset", function( ply )
         ply.ZappedRagdoll = nil
     end
 
-    ply.GotZapped = false
+    ply.GotZapped = nil
     ply:UnSpectate()
 end )
 

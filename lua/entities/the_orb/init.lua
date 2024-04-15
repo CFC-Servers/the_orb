@@ -76,7 +76,6 @@ function ENT:CanZap( e )
     end
 
     local eClass = e:GetClass()
-
     if rawget( self.ZapClassBlacklist, eClass ) then
         return false
     end
@@ -195,7 +194,6 @@ function ENT:Zap( target )
     if target.IsOrb then return end
 
     timer.Simple( 0.4, function()
-        if not IsValid( self ) then return end
         if not IsValid( target ) then return end
         if target:IsPlayer() then
             target:UnLock()
@@ -203,7 +201,11 @@ function ENT:Zap( target )
                 target:StopLoopingSound( target.ZapBuzzSound )
             end
 
-            self:HandlePlayerZap( target )
+            if IsValid( self ) then
+                self:HandlePlayerZap( target )
+            end
+
+            target.GotZapped = nil
             return
         end
 
