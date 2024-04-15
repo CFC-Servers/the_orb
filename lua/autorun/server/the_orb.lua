@@ -4,20 +4,8 @@ local rawget = rawget
 util.AddNetworkString( "TheOrb_Zap" )
 resource.AddWorkshop( "3114953830" )
 
-OrbManager = {
-    Orbs = {}
-}
-
 local minGazeDuration = 3
 local maxGazeDuration = 21.15
-
-function OrbManager:AddOrb( orb )
-    self.Orbs[orb] = true
-end
-
-function OrbManager:RemoveOrb( orb )
-    self.Orbs[orb] = nil
-end
 
 local function setWeapon( ply, orb )
     if not IsValid( orb ) then return end
@@ -137,7 +125,7 @@ local function handlePlayerView( ply )
     end
 end
 
-hook.Add( "Think", "TheOrb_Think", function()
+local function orbThink()
     local plys = player.GetAll()
     local plyCount = #plys
 
@@ -145,6 +133,14 @@ hook.Add( "Think", "TheOrb_Think", function()
         local ply = rawget( plys, i )
         handlePlayerView( ply )
     end
+end
+
+hook.Add( "TheOrb_OrbAdded", "TheOrb_OrbAdded", function()
+    hook.Add( "Think", "TheOrb_Think", orbThink )
+end )
+
+hook.Add( "TheOrb_LastOrbRemoved", "TheOrb_LastOrbRemoved", function()
+    hook.Remove( "Think", "TheOrb_Think" )
 end )
 
 hook.Add( "EntityTakeDamage", "TheOrb_Revenge", function( ent, dmg )

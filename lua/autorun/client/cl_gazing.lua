@@ -462,8 +462,7 @@ local function drawGazingPlayer( ply )
     end
 end
 
-
-hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
+local function drawLineWorld()
     -- Draw black over the skybox if we're drawing LineWorld
     if not isDrawingLineWorld then return end
     render_OverrideDepthEnable( true, false )
@@ -476,9 +475,9 @@ hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", function()
 
     render_OverrideDepthEnable( false, false )
     render_SetLightingMode( 0 )
-end )
+end
 
-hook.Add( "PostDrawTranslucentRenderables", "TheOrb_Gazing", function( _, skybox, skybox3d )
+local function drawGazingPlayers( _, skybox, skybox3d )
     if skybox then return end
     if skybox3d then return end
     local plys = player.GetAll()
@@ -494,9 +493,9 @@ hook.Add( "PostDrawTranslucentRenderables", "TheOrb_Gazing", function( _, skybox
         end
     end
     cam.End3D()
-end )
+end
 
-hook.Add( "CalcMainActivity", "TheOrb_Gazing", function( ply )
+local function calcMainActivity( ply )
     local plyIsGazing = ply:GetNW2Bool( "TheOrb_IsGazing", false )
     if not plyIsGazing then return end
 
@@ -504,7 +503,7 @@ hook.Add( "CalcMainActivity", "TheOrb_Gazing", function( ply )
     if intensity >= 0.1 then
         return ACT_HL2MP_IDLE_ZOMBIE, -1
     end
-end )
+end
 
 local function gazeTick()
     local wasGazing = isGazing
@@ -586,4 +585,19 @@ local function gazeTick()
     end
 end
 
-hook.Add( "Tick", "TheOrb_Gazing", gazeTick )
+hook.Add( "TheOrb_OrbAdded", "TheOrb_OrbAdded", function()
+    hook.Add( "Tick", "TheOrb_Gazing", gazeTick )
+    hook.Add( "CalcMainActivity", "TheOrb_Gazing", calcMainActivity )
+    hook.Add( "PostDrawTranslucentRenderables", "TheOrb_Gazing", drawGazingPlayers )
+    hook.Add( "PostDraw2DSkyBox", "TheOrb_LineWorld", drawLineWorld )
+end )
+
+hook.Add( "TheOrb_LastOrbRemoved", "TheOrb_LastOrbRemoved", function()
+    timer.Simple( 0, function() -- Delay so the tick hook can finish
+        hook.Remove( "Tick", "TheOrb_Gazing" )
+    end )
+
+    hook.Remove( "CalcMainActivity", "TheOrb_Gazing" )
+    hook.Remove( "PostDrawTranslucentRenderables", "TheOrb_Gazing" )
+    hook.Remove( "PostDraw2DSkyBox", "TheOrb_LineWorld" )
+end )
