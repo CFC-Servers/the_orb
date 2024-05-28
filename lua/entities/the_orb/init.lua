@@ -205,7 +205,6 @@ function ENT:Zap( target )
                 self:HandlePlayerZap( target )
             end
 
-            target.GotZapped = nil
             return
         end
 
@@ -234,7 +233,7 @@ function ENT:Think()
             return
         end
 
-        local ent = rawget( nearby, i )
+        local ent = nearby[i]
         if not ent.GotZapped and self:CanZap( ent ) then
             zapCount = zapCount + 1
 
