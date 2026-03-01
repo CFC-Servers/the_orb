@@ -254,3 +254,7 @@ function ENT:Think()
 
     return true
 end
+
+function ENT:Remove()
+    -- noop
+end
