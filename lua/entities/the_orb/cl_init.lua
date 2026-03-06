@@ -94,3 +94,43 @@ function ENT:StartZap( target )
         self:Zap( target )
     end )
 end
+
+function ENT:Draw(flags)
+	local distance = self:GetPos():Distance(LocalPlayer():GetPos())
+	if distance > 100 then
+		distance = (distance / 100) / (2000 / 100)
+	end
+
+	local pulseSize = math.Clamp(distance, 1.2, 5)
+	local pulseDuration = 0.5 * pulseSize
+
+	local curTime = CurTime()
+	local tbl = self:GetTable()
+	local originalScale = self:GetModelScale()
+	local nextPulse = tbl.nextPulse or curTime
+	if curTime < nextPulse then
+		tbl.currentPulseSize = Lerp(math.Clamp((curTime - tbl.lastPulse) / (tbl.endPulse - tbl.lastPulse), 0, 1), (tbl.lastPulseSize or originalScale), originalScale)
+		self:SetModelScale(tbl.currentPulseSize, 0)
+	else
+		local newScale = originalScale * pulseSize
+		self:SetModelScale(newScale, 0)
+		self:EmitSound("the_orb/heartbeat.mp3", 75, 100, 1, CHAN_STATIC, 0, 1 / pulseSize)
+		tbl.currentPulseSize = newScale
+		tbl.nextPulse = nextPulse + (0.7 * math.pow(pulseSize, 1.1))
+		tbl.endPulse = nextPulse + pulseDuration
+		tbl.lastPulse = curTime
+		tbl.lastPulseSize = newScale
+	end
+
+	if tbl.lastPulse then
+		local r, g, b = 255, 0, 0
+		render.SetColorModulation(r / 255, g / 255, b / 255)
+		render.SetBlend(1)
+		render.SetBlend((tbl.currentPulseSize - originalScale) / (pulseSize - originalScale))
+		self:DrawModel(flags)
+		render.SetBlend(1)
+		self:SetModelScale(originalScale, 0)
+	end
+
+	self:DrawModel(flags)
+end
