@@ -116,7 +116,7 @@ function ENT:Draw(flags)
 		self:SetModelScale(newScale, 0)
 		self:EmitSound("the_orb/heartbeat.mp3", 75, 100, 1, CHAN_STATIC, 0, 1 / pulseSize)
 		tbl.currentPulseSize = newScale
-		tbl.nextPulse = nextPulse + (0.7 * math.pow(pulseSize, 1.1))
+		tbl.nextPulse = nextPulse + math.random(2, 4) + (0.7 * math.pow(pulseSize, 1.1)) -- The further back you go- the slower it pulses!
 		tbl.endPulse = nextPulse + pulseDuration
 		tbl.lastPulse = curTime
 		tbl.lastPulseSize = newScale
